@@ -1,3 +1,86 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import 'tailwindcss';
+
+/* Clases compartidas del panel */
+@layer components {
+  .page-title {
+    @apply text-2xl font-semibold text-gray-900;
+  }
+  .page-subtitle {
+    @apply mt-1 text-sm text-gray-600;
+  }
+  .card {
+    @apply rounded-xl bg-white p-5 shadow-sm;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-gray-700;
+  }
+  .input {
+    @apply w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100;
+  }
+  .input[aria-invalid='true'] {
+    @apply border-red-500;
+  }
+  .error {
+    @apply mt-1 text-xs text-red-600;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+  .btn-secondary {
+    @apply border border-gray-300 bg-white text-gray-800 hover:bg-gray-100;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1 text-xs;
+  }
+  .table-wrap {
+    @apply overflow-x-auto rounded-xl bg-white shadow-sm;
+  }
+  .table {
+    @apply min-w-full text-left text-sm;
+  }
+  .table thead {
+    @apply border-b border-gray-200 bg-gray-50 text-gray-600;
+  }
+  .table th {
+    @apply px-4 py-3 font-medium whitespace-nowrap;
+  }
+  .table td {
+    @apply border-b border-gray-100 px-4 py-3;
+  }
+  .table tbody tr:last-child td {
+    @apply border-0;
+  }
+  .badge {
+    @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .badge-green {
+    @apply bg-green-100 text-green-800;
+  }
+  .badge-yellow {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  .badge-red {
+    @apply bg-red-100 text-red-800;
+  }
+  .badge-gray {
+    @apply bg-gray-100 text-gray-700;
+  }
+  .badge-blue {
+    @apply bg-blue-100 text-blue-800;
+  }
+  .alert-error {
+    @apply rounded-md bg-red-50 px-3 py-2 text-sm text-red-700;
+  }
+  .alert-success {
+    @apply rounded-md bg-green-50 px-3 py-2 text-sm text-green-800;
+  }
+  .alert-info {
+    @apply rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800;
+  }
+}

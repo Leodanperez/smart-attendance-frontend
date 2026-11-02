@@ -1,0 +1,150 @@
+rules_version = '2';
+
+// Reglas compartidas por el panel web (Angular) y la app Android.
+// Probar con Firebase Emulator Suite antes de desplegar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function signedIn() { return request.auth != null; }
+    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function me() { return get(userDoc(request.auth.uid)).data; }
+    function isActive() {
+      return signedIn() && exists(userDoc(request.auth.uid))
+        && me().get('status', 'ACTIVE') == 'ACTIVE';
+    }
+    function hasRole(role) { return isActive() && me().role == role; }
+    function isAdmin() { return hasRole('ADMIN'); }
+    function isTeacher() { return hasRole('TEACHER'); }
+
+    function courseData(courseId) { return get(/databases/$(database)/documents/courses/$(courseId)).data; }
+    function teaches(courseId) { return isTeacher() && request.auth.uid in courseData(courseId).teacherIds; }
+    function enrolledIn(courseId) {
+      return isActive()
+        && get(/databases/$(database)/documents/enrollments/$(courseId + '_' + request.auth.uid)).data.status == 'ACTIVE';
+    }
+    function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // ---------- users/{uid} ----------
+    match /users/{uid} {
+      allow get: if signedIn() && (
+        request.auth.uid == uid
+        || isAdmin()
+        || (isTeacher() && resource.data.role in ['STUDENT', 'TEACHER'])
+        || (isActive() && resource.data.role == 'TEACHER')
+      );
+      allow list: if isAdmin();
+
+      // ADMIN registra usuarios desde el panel.
+      // Alta propia desde Android: solo perfil STUDENT en estado PENDING.
+      allow create: if isAdmin() || (
+        signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'STUDENT'
+        && request.resource.data.status == 'PENDING'
+      );
+
+      // ADMIN no puede cambiar su propio rol/estado. Cada usuario solo edita datos básicos propios.
+      allow update: if (
+          isAdmin() && (uid != request.auth.uid || !changedKeys().hasAny(['role', 'status', 'uid']))
+        ) || (
+          request.auth.uid == uid
+          && changedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'phone', 'address', 'photoUrl', 'updatedAt'])
+        );
+      allow delete: if false;
+    }
+
+    // ---------- courses/{courseId} ----------
+    match /courses/{courseId} {
+      allow get: if isAdmin()
+        || (isTeacher() && request.auth.uid in resource.data.teacherIds)
+        || enrolledIn(courseId);
+      allow list: if isAdmin() || (isTeacher() && request.auth.uid in resource.data.teacherIds);
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ---------- enrollments/{courseId_studentId} ----------
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin()
+        || teaches(resource.data.courseId)
+        || (signedIn() && resource.data.studentId == request.auth.uid);
+      // El canje de códigos lo hace la Cloud Function (Admin SDK). Desde el cliente solo ADMIN.
+      allow create, update: if isAdmin()
+        && enrollmentId == request.resource.data.courseId + '_' + request.resource.data.studentId;
+      allow delete: if false;
+    }
+
+    // ---------- enrollmentCodes/{codeId} ----------
+    match /enrollmentCodes/{codeId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.status == 'ACTIVE'
+        && request.resource.data.uses == 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.codeHash is string
+        && request.resource.data.codeHash.size() == 64;
+      allow update: if isAdmin()
+        && changedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'DISABLED';
+      allow delete: if false;
+    }
+
+    // ---------- sessions/{sessionId} ----------
+    match /sessions/{sessionId} {
+      allow read: if isAdmin()
+        || teaches(resource.data.courseId)
+        || enrolledIn(resource.data.courseId);
+      allow create: if (isAdmin() || teaches(request.resource.data.courseId))
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.status == 'ACTIVE'
+        && request.resource.data.expiresAt > request.resource.data.startsAt;
+      allow update: if (isAdmin() || teaches(resource.data.courseId))
+        && changedKeys().hasOnly(['status', 'closedAt'])
+        && request.resource.data.status == 'CLOSED';
+      allow delete: if false;
+    }
+
+    // ---------- sessionTokens/{tokenId}: solo Cloud Functions ----------
+    match /sessionTokens/{tokenId} {
+      allow read, write: if false;
+    }
+
+    // ---------- attendances/{sessionId_studentId} ----------
+    match /attendances/{attendanceId} {
+      allow read: if isAdmin()
+        || teaches(resource.data.courseId)
+        || (signedIn() && resource.data.studentId == request.auth.uid);
+
+      // Solo correcciones manuales con motivo. El registro por QR lo crea la Cloud Function.
+      allow create, update: if (isAdmin() || teaches(request.resource.data.courseId))
+        && attendanceId == request.resource.data.sessionId + '_' + request.resource.data.studentId
+        && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.courseId
+             == request.resource.data.courseId
+        && request.resource.data.status in ['PRESENT', 'LATE', 'ABSENT', 'JUSTIFIED']
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updateReason is string
+        && request.resource.data.updateReason.size() > 0
+        && (resource == null || (
+          resource.data.courseId == request.resource.data.courseId
+          && resource.data.sessionId == request.resource.data.sessionId
+          && resource.data.studentId == request.resource.data.studentId
+        ));
+      allow delete: if false;
+    }
+
+    // ---------- auditLogs/{logId}: solo se crean, nunca se editan ni borran ----------
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isActive()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // ---------- settings/{docId} ----------
+    match /settings/{docId} {
+      allow read: if isActive();
+      allow write: if isAdmin();
+    }
+  }
+}
