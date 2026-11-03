@@ -8,8 +8,10 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ROLE_LABELS, UserProfile } from '../../core/models/user.model';
 import { errorMessage } from '../../core/services/error-message';
 import { FONT_SCALE_LABELS, FontScale, PreferencesService } from '../../core/services/preferences.service';
+import { THEME_LABELS, ThemeMode, ThemeService } from '../../core/services/theme.service';
 import { UserService } from '../../core/services/user.service';
 import { PHONE_PATTERN, nameValidators } from '../../shared/validators/user-validators';
+import { ToastService } from '../../shared/toast/toast.service';
 
 /** W14 — Perfil y configuración personal. */
 @Component({
@@ -31,24 +33,24 @@ import { PHONE_PATTERN, nameValidators } from '../../shared/validators/user-vali
         @if (profile()?.photoUrl) {
           <img [src]="profile()?.photoUrl" alt="Tu fotografía de perfil" class="h-20 w-20 rounded-full object-cover" />
         } @else {
-          <span class="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-2xl font-semibold text-blue-700" aria-hidden="true">
+          <span class="flex h-20 w-20 items-center justify-center rounded-full bg-primary-fixed text-2xl font-semibold text-primary" aria-hidden="true">
             {{ initials() }}
           </span>
         }
         <div class="flex-1">
-          <p class="font-medium text-gray-900">{{ me()?.displayName }}</p>
-          <p class="text-sm text-gray-600">{{ me()?.email }} · {{ me() ? roleLabels[me()!.role] : '' }}</p>
+          <p class="font-medium text-on-surface">{{ me()?.displayName }}</p>
+          <p class="text-sm text-on-surface-variant">{{ me()?.email }} · {{ me() ? roleLabels[me()!.role] : '' }}</p>
           <label for="photo" class="btn btn-secondary btn-sm mt-2 cursor-pointer">
             {{ uploading() ? 'Subiendo…' : 'Cambiar fotografía' }}
           </label>
           <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only"
             [disabled]="uploading()" (change)="upload($event)" />
-          <p class="mt-1 text-xs text-gray-500">JPG, PNG o WEBP, máximo 2 MB.</p>
+          <p class="mt-1 text-xs text-on-surface-variant">JPG, PNG o WEBP, máximo 2 MB.</p>
         </div>
       </section>
 
       <form [formGroup]="form" (ngSubmit)="save()" novalidate class="card grid gap-4 sm:grid-cols-2" aria-labelledby="data-title">
-        <h2 id="data-title" class="font-medium text-gray-900 sm:col-span-2">Datos personales</h2>
+        <h2 id="data-title" class="font-medium text-on-surface sm:col-span-2">Datos personales</h2>
         <div>
           <label for="firstName" class="label">Nombres</label>
           <input id="firstName" formControlName="firstName" autocomplete="given-name" class="input"
@@ -61,11 +63,11 @@ import { PHONE_PATTERN, nameValidators } from '../../shared/validators/user-vali
         </div>
         <div>
           <label for="email" class="label">Correo</label>
-          <input id="email" [value]="me()?.email ?? ''" class="input bg-gray-50" readonly />
+          <input id="email" [value]="me()?.email ?? ''" class="input bg-surface-container-low" readonly />
         </div>
         <div>
           <label for="role" class="label">Rol</label>
-          <input id="role" [value]="me() ? roleLabels[me()!.role] : ''" class="input bg-gray-50" readonly />
+          <input id="role" [value]="me() ? roleLabels[me()!.role] : ''" class="input bg-surface-container-low" readonly />
         </div>
         <div>
           <label for="phone" class="label">Celular</label>
@@ -83,8 +85,20 @@ import { PHONE_PATTERN, nameValidators } from '../../shared/validators/user-vali
       </form>
 
       <section class="card" aria-labelledby="prefs-title">
-        <h2 id="prefs-title" class="font-medium text-gray-900">Preferencias visuales</h2>
+        <h2 id="prefs-title" class="font-medium text-on-surface">Preferencias visuales</h2>
         <fieldset class="mt-3">
+          <legend class="label">Tema</legend>
+          <div class="flex flex-wrap gap-4">
+            @for (mode of themeModes; track mode[0]) {
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="themeMode" [value]="mode[0]" [checked]="theme.mode() === mode[0]"
+                  (change)="theme.mode.set(mode[0])" />
+                {{ mode[1] }}
+              </label>
+            }
+          </div>
+        </fieldset>
+        <fieldset class="mt-4">
           <legend class="label">Tamaño de texto</legend>
           <div class="flex flex-wrap gap-4">
             @for (scale of scales; track scale[0]) {
@@ -109,6 +123,8 @@ export class Profile {
   private readonly userService = inject(UserService);
   private readonly router = inject(Router);
   protected readonly preferences = inject(PreferencesService);
+  protected readonly theme = inject(ThemeService);
+  protected readonly themeModes = Object.entries(THEME_LABELS) as [ThemeMode, string][];
 
   protected readonly me = this.auth.currentUser;
   protected readonly roleLabels = ROLE_LABELS;
@@ -116,6 +132,7 @@ export class Profile {
 
   protected readonly saving = signal(false);
   protected readonly uploading = signal(false);
+  private readonly toast = inject(ToastService);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
 
@@ -191,9 +208,10 @@ export class Profile {
     this.error.set(null);
     this.message.set(null);
     try {
-      this.message.set(await action());
+      const msg = await action();
+      if (msg) this.toast.success(msg);
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       flag.set(false);
     }

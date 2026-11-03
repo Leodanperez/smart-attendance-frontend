@@ -7,7 +7,8 @@ import { UserProfile, fullName } from '../../core/models/user.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
 import { CourseService } from '../../core/services/course.service';
 import { errorMessage } from '../../core/services/error-message';
-import { askOptionalReason } from '../../shared/utils/prompt';
+import { DialogService } from '../../shared/dialogs/dialog.service';
+import { ToastService } from '../../shared/toast/toast.service';
 
 /** W06 — Asignación de docentes. */
 @Component({
@@ -27,7 +28,7 @@ import { askOptionalReason } from '../../shared/utils/prompt';
     <div class="mt-6 grid gap-4 lg:grid-cols-3">
       <!-- Docentes -->
       <section class="card" aria-labelledby="teachers-title">
-        <h2 id="teachers-title" class="font-medium text-gray-900">Docentes activos</h2>
+        <h2 id="teachers-title" class="font-medium text-on-surface">Docentes activos</h2>
         <label for="t-search" class="sr-only">Buscar docente</label>
         <input id="t-search" type="search" class="input mt-3" placeholder="Buscar por nombre o correo"
           #q (input)="search.set(q.value)" />
@@ -36,14 +37,14 @@ import { askOptionalReason } from '../../shared/utils/prompt';
             <li>
               <button type="button" role="option" [attr.aria-selected]="t.uid === teacherId()"
                 (click)="teacherId.set(t.uid)"
-                class="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                [class.bg-blue-50]="t.uid === teacherId()" [class.text-blue-800]="t.uid === teacherId()">
+                class="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-container-high"
+                [class.bg-primary-fixed]="t.uid === teacherId()" [class.text-primary]="t.uid === teacherId()">
                 <span class="block font-medium">{{ name(t) }}</span>
-                <span class="block text-xs text-gray-500">{{ t.email }} · {{ coursesOf(t.uid).length }} curso(s)</span>
+                <span class="block text-xs text-on-surface-variant">{{ t.email }} · {{ coursesOf(t.uid).length }} curso(s)</span>
               </button>
             </li>
           } @empty {
-            <li class="px-3 py-2 text-sm text-gray-500">No hay docentes activos.</li>
+            <li class="px-3 py-2 text-sm text-on-surface-variant">No hay docentes activos.</li>
           }
         </ul>
       </section>
@@ -51,8 +52,8 @@ import { askOptionalReason } from '../../shared/utils/prompt';
       <!-- Asignación -->
       <section class="card lg:col-span-2" aria-labelledby="assign-title">
         @if (teacher(); as t) {
-          <h2 id="assign-title" class="font-medium text-gray-900">{{ name(t) }}</h2>
-          <p class="text-sm text-gray-500">{{ t.email }}</p>
+          <h2 id="assign-title" class="font-medium text-on-surface">{{ name(t) }}</h2>
+          <p class="text-sm text-on-surface-variant">{{ t.email }}</p>
 
           <div class="mt-4 flex flex-wrap items-end gap-2">
             <div class="min-w-64 flex-1">
@@ -69,22 +70,22 @@ import { askOptionalReason } from '../../shared/utils/prompt';
             </button>
           </div>
 
-          <h3 class="mt-6 text-sm font-medium text-gray-700">Cursos actuales del docente</h3>
-          <ul class="mt-2 divide-y divide-gray-100">
+          <h3 class="mt-6 text-sm font-medium text-on-surface">Cursos actuales del docente</h3>
+          <ul class="mt-2 divide-y divide-outline-variant/50">
             @for (c of coursesOf(t.uid); track c.id) {
               <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <a [routerLink]="['/courses', c.id]" class="text-blue-700 hover:underline">{{ label(c) }}</a>
+                <a [routerLink]="['/courses', c.id]" class="text-primary hover:underline">{{ label(c) }}</a>
                 <button type="button" class="btn btn-secondary btn-sm" [disabled]="busy()" (click)="remove(t, c)">
                   Retirar
                 </button>
               </li>
             } @empty {
-              <li class="py-2 text-sm text-gray-500">Sin cursos asignados.</li>
+              <li class="py-2 text-sm text-on-surface-variant">Sin cursos asignados.</li>
             }
           </ul>
         } @else {
           <h2 id="assign-title" class="sr-only">Asignación</h2>
-          <p class="text-sm text-gray-500">Selecciona un docente de la lista.</p>
+          <p class="text-sm text-on-surface-variant">Selecciona un docente de la lista.</p>
         }
       </section>
     </div>
@@ -96,6 +97,7 @@ export class TeacherAssignments {
 
   private readonly scope = inject(AcademicScopeService);
   private readonly courseService = inject(CourseService);
+  private readonly dialogs = inject(DialogService);
 
   protected readonly name = fullName;
   protected readonly label = courseLabel;
@@ -107,6 +109,7 @@ export class TeacherAssignments {
   protected readonly teacherId = signal<string | null>(null);
   protected readonly courseId = signal('');
   protected readonly busy = signal(false);
+  private readonly toast = inject(ToastService);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
 
@@ -138,7 +141,12 @@ export class TeacherAssignments {
   async assign(teacher: UserProfile): Promise<void> {
     const course = this.courses().find((c) => c.id === this.courseId());
     if (!course) return;
-    if (!window.confirm(`¿Asignar a ${fullName(teacher)} al curso ${courseLabel(course)}?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Asignar docente',
+      message: `¿Asignar a ${fullName(teacher)} al curso ${courseLabel(course)}?`,
+      confirmText: 'Asignar',
+    });
+    if (!ok) return;
     await this.run(async () => {
       await this.courseService.assignTeacher(course, teacher.uid);
       this.courseId.set('');
@@ -147,8 +155,13 @@ export class TeacherAssignments {
   }
 
   async remove(teacher: UserProfile, course: Course): Promise<void> {
-    if (!window.confirm(`¿Retirar a ${fullName(teacher)} del curso ${courseLabel(course)}?`)) return;
-    const reason = askOptionalReason('Motivo (opcional):');
+    const reason = await this.dialogs.reason({
+      title: 'Retirar docente',
+      message: `¿Retirar a ${fullName(teacher)} del curso ${courseLabel(course)}?`,
+      confirmText: 'Retirar',
+      tone: 'danger',
+      required: false,
+    });
     if (reason === null) return;
     await this.run(async () => {
       await this.courseService.removeTeacher(course, teacher.uid, reason || null);
@@ -161,9 +174,10 @@ export class TeacherAssignments {
     this.error.set(null);
     this.message.set(null);
     try {
-      this.message.set(await action());
+      const msg = await action();
+      if (msg) this.toast.success(msg);
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }

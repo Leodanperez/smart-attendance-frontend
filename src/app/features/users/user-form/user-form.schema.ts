@@ -13,7 +13,6 @@ import {
 
 import {
   DOCUMENT_PATTERNS,
-  INSTITUTIONAL_CODE_PATTERN,
   NAME_PATTERN,
   PASSWORD_PATTERN,
   PHONE_PATTERN,
@@ -114,17 +113,8 @@ export function userFormSchema(isTaken: UniqueChecker) {
     maxLength(contact.address, 150, { message: 'Máximo 150 caracteres.' });
 
     // ---------- Cuenta institucional ----------
+    // El código institucional (PREFIJO-DOCUMENTO) se genera; su unicidad la garantiza el documento.
     required(account.role, { message: 'Selecciona un rol.' });
-
-    // Condicional: obligatorio para estudiantes y docentes; opcional para administradores.
-    required(account.institutionalCode, {
-      message: 'Ingresa el código institucional.',
-      when: ({ valueOf }) => valueOf(account.role) !== 'ADMIN',
-    });
-    optionalPattern(account.institutionalCode, INSTITUTIONAL_CODE_PATTERN,
-      '3 a 20 caracteres: letras, números o guiones.');
-    unique(account.institutionalCode, 'institutionalCode', (v) => v.trim().toUpperCase(),
-      'Ya existe un usuario con ese código institucional.', isTaken);
 
     required(account.password, { message: 'Ingresa una contraseña.' });
     minLength(account.password, 8, { message: 'Mínimo 8 caracteres.' });

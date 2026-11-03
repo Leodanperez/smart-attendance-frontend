@@ -24,6 +24,7 @@ import {
   UserProfile,
   UserRole,
   UserStatus,
+  buildInstitutionalCode,
   fullName,
 } from '../../core/models/user.model';
 import { AuditService } from '../../core/services/audit.service';
@@ -33,16 +34,16 @@ import { errorMessage } from '../../core/services/error-message';
 import { uniq } from '../../core/services/firestore.utils';
 import { UserService } from '../../core/services/user.service';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
-import { askOptionalReason, askReason } from '../../shared/utils/prompt';
+import { DialogService } from '../../shared/dialogs/dialog.service';
 import {
   DOCUMENT_PATTERNS,
-  INSTITUTIONAL_CODE_PATTERN,
   PHONE_PATTERN,
   birthDateValidator,
   documentValidators,
   nameValidators,
   todayIso,
 } from '../../shared/validators/user-validators';
+import { ToastService } from '../../shared/toast/toast.service';
 
 interface Related {
   courses: Course[];
@@ -54,10 +55,10 @@ interface Related {
   selector: 'app-user-detail',
   imports: [RouterLink, DatePipe, TsDatePipe, ReactiveFormsModule],
   template: `
-    <a routerLink="/users" class="text-sm text-blue-600 hover:underline">← Volver a usuarios</a>
+    <a routerLink="/users" class="text-sm text-primary hover:underline">← Volver a usuarios</a>
 
     @if (user() === undefined) {
-      <p class="mt-4 text-sm text-gray-500">Cargando…</p>
+      <p class="mt-4 text-sm text-on-surface-variant">Cargando…</p>
     } @else if (user() === null) {
       <p class="alert-error mt-4">El usuario no existe.</p>
     } @else {
@@ -69,7 +70,7 @@ interface Related {
           }
           <div>
             <h1 class="page-title">{{ name(u) }}</h1>
-            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
               <span class="badge badge-blue">{{ roleLabels[u.role] }}</span>
               <span [class]="statusBadge[u.status]">{{ statusLabels[u.status] }}</span>
               <span>{{ u.email }}</span>
@@ -103,7 +104,7 @@ interface Related {
         <!-- Perfil -->
         <section class="card lg:col-span-2" aria-labelledby="profile-title">
           <div class="flex items-center justify-between">
-            <h2 id="profile-title" class="font-medium text-gray-900">Datos de perfil</h2>
+            <h2 id="profile-title" class="font-medium text-on-surface">Datos de perfil</h2>
             @if (!editing()) {
               <button type="button" class="btn btn-secondary btn-sm" (click)="startEdit(u)">Editar datos institucionales</button>
             }
@@ -111,14 +112,14 @@ interface Related {
 
           @if (!editing()) {
             <dl class="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div><dt class="text-gray-500">Código institucional</dt><dd class="font-medium">{{ u.institutionalCode || '—' }}</dd></div>
-              <div><dt class="text-gray-500">Documento</dt><dd class="font-medium">{{ u.documentType ? docLabels[u.documentType] : '' }} {{ u.documentNumber || '—' }}</dd></div>
-              <div><dt class="text-gray-500">Fecha de nacimiento</dt><dd class="font-medium">{{ u.birthDate || '—' }}</dd></div>
-              <div><dt class="text-gray-500">Sexo</dt><dd class="font-medium">{{ u.gender ? genderLabels[u.gender] : '—' }}</dd></div>
-              <div><dt class="text-gray-500">Celular</dt><dd class="font-medium">{{ u.phone || '—' }}</dd></div>
-              <div><dt class="text-gray-500">Dirección</dt><dd class="font-medium">{{ u.address || '—' }}</dd></div>
-              <div><dt class="text-gray-500">Fecha de registro</dt><dd class="font-medium">{{ u.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
-              <div><dt class="text-gray-500">Última actualización</dt><dd class="font-medium">{{ u.updatedAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Código institucional</dt><dd class="font-medium">{{ u.institutionalCode || '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Documento</dt><dd class="font-medium">{{ u.documentType ? docLabels[u.documentType] : '' }} {{ u.documentNumber || '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Fecha de nacimiento</dt><dd class="font-medium">{{ u.birthDate || '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Sexo</dt><dd class="font-medium">{{ u.gender ? genderLabels[u.gender] : '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Celular</dt><dd class="font-medium">{{ u.phone || '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Dirección</dt><dd class="font-medium">{{ u.address || '—' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Fecha de registro</dt><dd class="font-medium">{{ u.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+              <div><dt class="text-on-surface-variant">Última actualización</dt><dd class="font-medium">{{ u.updatedAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
             </dl>
           } @else {
             <form [formGroup]="form" (ngSubmit)="save(u)" novalidate class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -132,7 +133,10 @@ interface Related {
               </div>
               <div>
                 <label for="d-code" class="label">Código institucional</label>
-                <input id="d-code" formControlName="institutionalCode" class="input" [attr.aria-invalid]="invalid('institutionalCode')" />
+                <output id="d-code" aria-live="polite" class="input block bg-primary-fixed/50 font-mono font-semibold text-primary">
+                  {{ codePreview(u) }}
+                </output>
+                <p class="hint">Se regenera con el número de documento.</p>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -179,7 +183,7 @@ interface Related {
 
         <!-- Rol y soporte -->
         <section class="card space-y-4" aria-labelledby="role-title">
-          <h2 id="role-title" class="font-medium text-gray-900">Rol y estado</h2>
+          <h2 id="role-title" class="font-medium text-on-surface">Rol y estado</h2>
           @if (isSelf()) {
             <p class="alert-info">No puedes modificar tu propio rol ni estado.</p>
           } @else {
@@ -198,10 +202,10 @@ interface Related {
             </div>
           }
           <details class="text-sm">
-            <summary class="cursor-pointer text-gray-700">Datos de soporte</summary>
+            <summary class="cursor-pointer text-on-surface">Datos de soporte</summary>
             <dl class="mt-2 space-y-2">
-              <div><dt class="text-gray-500">UID</dt><dd class="font-mono text-xs break-all">{{ u.uid }}</dd></div>
-              <div><dt class="text-gray-500">Proveedor de autenticación</dt><dd>{{ providerLabels[u.authProvider] || u.authProvider }}</dd></div>
+              <div><dt class="text-on-surface-variant">UID</dt><dd class="font-mono text-xs break-all">{{ u.uid }}</dd></div>
+              <div><dt class="text-on-surface-variant">Proveedor de autenticación</dt><dd>{{ providerLabels[u.authProvider] || u.authProvider }}</dd></div>
             </dl>
           </details>
         </section>
@@ -209,29 +213,29 @@ interface Related {
 
       <!-- Cursos e inscripciones -->
       <section class="card mt-4" aria-labelledby="courses-title">
-        <h2 id="courses-title" class="font-medium text-gray-900">
+        <h2 id="courses-title" class="font-medium text-on-surface">
           {{ u.role === 'STUDENT' ? 'Inscripciones' : 'Cursos asignados' }}
         </h2>
-        <ul class="mt-3 divide-y divide-gray-100">
+        <ul class="mt-3 divide-y divide-outline-variant/50">
           @if (u.role === 'STUDENT') {
             @for (e of related().enrollments; track e.id) {
               <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <a [routerLink]="['/courses', e.courseId]" class="text-blue-700 hover:underline">{{ courseName(e.courseId) }}</a>
-                <span class="text-gray-500">
+                <a [routerLink]="['/courses', e.courseId]" class="text-primary hover:underline">{{ courseName(e.courseId) }}</a>
+                <span class="text-on-surface-variant">
                   {{ enrollmentLabels[e.status] }} · {{ e.enrolledAt | tsDate | date: 'dd/MM/yyyy' }}
                 </span>
               </li>
             } @empty {
-              <li class="py-2 text-sm text-gray-500">Sin inscripciones.</li>
+              <li class="py-2 text-sm text-on-surface-variant">Sin inscripciones.</li>
             }
           } @else {
             @for (c of related().courses; track c.id) {
               <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <a [routerLink]="['/courses', c.id]" class="text-blue-700 hover:underline">{{ label(c) }}</a>
+                <a [routerLink]="['/courses', c.id]" class="text-primary hover:underline">{{ label(c) }}</a>
                 <span [class]="courseBadge[c.status]">{{ courseStatus[c.status] }}</span>
               </li>
             } @empty {
-              <li class="py-2 text-sm text-gray-500">Sin cursos asociados.</li>
+              <li class="py-2 text-sm text-on-surface-variant">Sin cursos asociados.</li>
             }
           }
         </ul>
@@ -239,20 +243,20 @@ interface Related {
 
       <!-- Actividad -->
       <section class="card mt-4" aria-labelledby="activity-title">
-        <h2 id="activity-title" class="font-medium text-gray-900">Historial de actividad</h2>
-        <ul class="mt-3 divide-y divide-gray-100">
+        <h2 id="activity-title" class="font-medium text-on-surface">Historial de actividad</h2>
+        <ul class="mt-3 divide-y divide-outline-variant/50">
           @for (log of activity(); track log.id) {
             <li class="py-2 text-sm">
               <div class="flex flex-wrap justify-between gap-2">
-                <span class="font-medium text-gray-900">{{ actionLabels[log.action] || log.action }}</span>
-                <span class="text-gray-500">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
+                <span class="font-medium text-on-surface">{{ actionLabels[log.action] || log.action }}</span>
+                <span class="text-on-surface-variant">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
               </div>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-on-surface-variant">
                 Por {{ log.actorName || log.actorId }}@if (log.reason) { · Motivo: {{ log.reason }} }
               </p>
             </li>
           } @empty {
-            <li class="py-2 text-sm text-gray-500">Sin actividad registrada.</li>
+            <li class="py-2 text-sm text-on-surface-variant">Sin actividad registrada.</li>
           }
         </ul>
       </section>
@@ -267,6 +271,7 @@ export class UserDetail {
   private readonly courseService = inject(CourseService);
   private readonly enrollmentService = inject(EnrollmentService);
   private readonly audit = inject(AuditService);
+  private readonly dialogs = inject(DialogService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly me = inject(AuthService).currentUser;
 
@@ -289,6 +294,7 @@ export class UserDetail {
 
   protected readonly busy = signal(false);
   protected readonly editing = signal(false);
+  private readonly toast = inject(ToastService);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
 
@@ -335,7 +341,6 @@ export class UserDetail {
   protected readonly form = this.fb.group({
     firstName: ['', nameValidators],
     lastName: ['', nameValidators],
-    institutionalCode: ['', [Validators.pattern(INSTITUTIONAL_CODE_PATTERN)]],
     documentType: this.fb.control<DocumentType>('DNI'),
     documentNumber: ['', documentValidators('DNI')],
     birthDate: ['', [Validators.required, birthDateValidator]],
@@ -355,6 +360,11 @@ export class UserDetail {
     return courseLabel(this.related().courses.find((c) => c.id === courseId));
   }
 
+  /** Código que quedará al guardar: prefijo del rol + documento ingresado. */
+  protected codePreview(u: UserProfile): string {
+    return buildInstitutionalCode(u.role, this.form.controls.documentNumber.value) ?? u.institutionalCode ?? '—';
+  }
+
   protected invalid(name: keyof typeof this.form.controls): boolean {
     const c = this.form.controls[name];
     return c.invalid && c.touched;
@@ -364,7 +374,6 @@ export class UserDetail {
     this.form.reset({
       firstName: u.firstName,
       lastName: u.lastName,
-      institutionalCode: u.institutionalCode ?? '',
       documentType: u.documentType ?? 'DNI',
       documentNumber: u.documentNumber ?? '',
       birthDate: u.birthDate ?? '',
@@ -382,7 +391,12 @@ export class UserDetail {
       this.error.set(`Revisa los campos marcados (documento: ${DOCUMENT_PATTERNS[docType].hint}).`);
       return;
     }
-    const reason = askOptionalReason('Motivo de la corrección (opcional):');
+    const reason = await this.dialogs.reason({
+      title: 'Guardar corrección de datos',
+      message: `Se actualizarán los datos institucionales de ${fullName(u)}.`,
+      confirmText: 'Guardar cambios',
+      required: false,
+    });
     if (reason === null) return;
     await this.run(async () => {
       const value = this.form.getRawValue();
@@ -399,7 +413,12 @@ export class UserDetail {
   async changeStatus(status: UserStatus): Promise<void> {
     const u = this.user();
     if (!u) return;
-    const reason = askReason(`Motivo para cambiar el estado a "${this.statusLabels[status]}":`);
+    const reason = await this.dialogs.reason({
+      title: `Cambiar estado a "${this.statusLabels[status]}"`,
+      message: fullName(u),
+      confirmText: status === 'DISABLED' ? 'Desactivar' : 'Activar',
+      tone: status === 'DISABLED' ? 'danger' : 'primary',
+    });
     if (!reason) return;
     await this.run(async () => {
       await this.userService.setStatus(u, status, reason);
@@ -410,7 +429,12 @@ export class UserDetail {
   async changeRole(role: UserRole): Promise<void> {
     const u = this.user();
     if (!u || role === u.role) return;
-    const reason = askReason(`Motivo para asignar el rol "${this.roleLabels[role]}":`);
+    const reason = await this.dialogs.reason({
+      title: `Asignar rol "${this.roleLabels[role]}"`,
+      message: `${fullName(u)} pasará de ${this.roleLabels[u.role]} a ${this.roleLabels[role]}.`,
+      confirmText: 'Asignar rol',
+      tone: 'warning',
+    });
     if (!reason) return;
     await this.run(async () => {
       await this.userService.setRole(u, role, reason);
@@ -423,9 +447,10 @@ export class UserDetail {
     this.error.set(null);
     this.message.set(null);
     try {
-      this.message.set(await action());
+      const msg = await action();
+      if (msg) this.toast.success(msg);
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }

@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { BookOpen, CalendarClock, ChartColumn, GraduationCap, UserCog } from 'lucide-angular';
 import { catchError, of } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
@@ -15,6 +16,7 @@ import { UserService } from '../../core/services/user.service';
 import { BarChart, BarDatum } from '../../shared/components/bar-chart';
 import { StatCard } from '../../shared/components/stat-card';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
+import { PeriodFilter } from '../../shared/utils/period-filter';
 
 const monthFormat = new Intl.DateTimeFormat('es-PE', { month: 'short', year: 'numeric' });
 const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short' });
@@ -40,12 +42,30 @@ const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'sho
     }
 
     <!-- Filtros -->
-    <section class="card mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filtros">
+    <section class="card mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Filtros">
+      <div>
+        <label for="f-period" class="label">Periodo académico</label>
+        <select id="f-period" class="input" #pe [value]="periodFilter.periodId()" (change)="periodFilter.periodId.set(pe.value); courseId.set('')">
+          <option value="">Todos</option>
+          @for (p of periodFilter.periods(); track p.id) {
+            <option [value]="p.id">{{ p.name }}{{ p.status === 'ACTIVE' ? ' (en curso)' : '' }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="f-career" class="label">Carrera</label>
+        <select id="f-career" class="input" #ca (change)="careerId.set(ca.value); courseId.set('')">
+          <option value="">Todas</option>
+          @for (career of careers(); track career.id) {
+            <option [value]="career.id">{{ career.name }}</option>
+          }
+        </select>
+      </div>
       <div>
         <label for="f-course" class="label">Curso</label>
-        <select id="f-course" class="input" #c (change)="courseId.set(c.value)">
+        <select id="f-course" class="input" #c [value]="courseId()" (change)="courseId.set(c.value)">
           <option value="">Todos</option>
-          @for (course of courses(); track course.id) {
+          @for (course of careerCourses(); track course.id) {
             <option [value]="course.id">{{ course.courseCode }} · {{ course.name }}</option>
           }
         </select>
@@ -72,7 +92,7 @@ const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'sho
     <!-- Indicadores -->
     <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Indicadores">
       @for (stat of stats(); track stat.label) {
-        <app-stat-card [label]="stat.label" [value]="stat.value" [hint]="stat.hint" />
+        <app-stat-card [label]="stat.label" [value]="stat.value" [hint]="stat.hint" [icon]="stat.icon" />
       }
     </section>
 
@@ -86,20 +106,20 @@ const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'sho
     <!-- Actividad reciente -->
     <section class="card mt-6" aria-labelledby="recent-title">
       <div class="flex items-center justify-between">
-        <h2 id="recent-title" class="font-medium text-gray-900">Actividad reciente</h2>
-        <a routerLink="/audit" class="text-sm text-blue-600 hover:underline">Ver auditoría</a>
+        <h2 id="recent-title" class="font-medium text-on-surface">Actividad reciente</h2>
+        <a routerLink="/audit" class="text-sm text-primary hover:underline">Ver auditoría</a>
       </div>
-      <ul class="mt-3 divide-y divide-gray-100">
+      <ul class="mt-3 divide-y divide-outline-variant/50">
         @for (log of recent(); track log.id) {
           <li class="flex flex-wrap justify-between gap-2 py-2 text-sm">
             <span>
-              <span class="font-medium text-gray-900">{{ log.actorName || log.actorId }}</span>
+              <span class="font-medium text-on-surface">{{ log.actorName || log.actorId }}</span>
               — {{ actionLabels[log.action] || log.action }}
             </span>
-            <span class="text-gray-500">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
+            <span class="text-on-surface-variant">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
           </li>
         } @empty {
-          <li class="py-2 text-sm text-gray-500">Sin actividad registrada.</li>
+          <li class="py-2 text-sm text-on-surface-variant">Sin actividad registrada.</li>
         }
       </ul>
     </section>
@@ -125,8 +145,22 @@ export class AdminDashboard {
     { initialValue: [] as AuditLog[] },
   );
 
+  protected readonly careerId = signal('');
   protected readonly courseId = signal('');
   protected readonly section = signal('');
+
+  /** Carreras con cursos (usa el nombre copiado en cada curso). */
+  protected readonly careers = computed(() => {
+    const map = new Map<string, string>();
+    for (const c of this.courses()) if (c.careerId) map.set(c.careerId, c.careerName ?? c.careerId);
+    return [...map].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  });
+  protected readonly periodFilter = new PeriodFilter();
+  protected readonly careerCourses = computed(() =>
+    this.courses().filter(
+      (c) => this.periodFilter.matches(c) && (!this.careerId() || c.careerId === this.careerId()),
+    ),
+  );
   protected readonly from = signal('');
   protected readonly to = signal('');
 
@@ -142,6 +176,8 @@ export class AdminDashboard {
   private readonly filteredCourses = computed(() =>
     this.courses().filter(
       (c) =>
+        this.periodFilter.matches(c) &&
+        (!this.careerId() || c.careerId === this.careerId()) &&
         (!this.courseId() || c.id === this.courseId()) &&
         (!this.section() || c.section === this.section()),
     ),
@@ -162,20 +198,23 @@ export class AdminDashboard {
     const reports = this.courseReports();
     const active = (role: string) => users.filter((u) => u.role === role && u.status === 'ACTIVE').length;
     return [
-      { label: 'Estudiantes activos', value: active('STUDENT'), hint: undefined },
-      { label: 'Docentes activos', value: active('TEACHER'), hint: undefined },
+      { label: 'Estudiantes activos', value: active('STUDENT'), hint: undefined, icon: GraduationCap },
+      { label: 'Docentes activos', value: active('TEACHER'), hint: undefined, icon: UserCog },
       {
         label: 'Cursos activos',
+        icon: BookOpen,
         value: this.filteredCourses().filter((c) => c.status === 'ACTIVE').length,
         hint: undefined,
       },
       {
         label: 'Sesiones realizadas',
+        icon: CalendarClock,
         value: reports.reduce((sum, r) => sum + r.closedSessions, 0),
         hint: 'Sesiones cerradas',
       },
       {
         label: 'Asistencia promedio',
+        icon: ChartColumn,
         value: percentLabel(this.reports.overall(reports)),
         hint: 'Presentes + tardanzas',
       },

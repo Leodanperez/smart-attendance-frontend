@@ -28,32 +28,32 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 
     <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Mis cursos">
       @for (r of reports(); track r.course.id) {
-        <a [routerLink]="['/courses', r.course.id]" class="card block hover:ring-2 hover:ring-blue-100">
-          <p class="font-medium text-gray-900">{{ label(r.course) }}</p>
-          <p class="mt-2 text-3xl font-semibold text-gray-900">{{ percent(r.students[0]?.percentage) }}</p>
-          <p class="text-xs text-gray-500">de asistencia</p>
+        <a [routerLink]="['/courses', r.course.id]" class="card block hover:ring-2 hover:ring-primary/20">
+          <p class="font-medium text-on-surface">{{ label(r.course) }}</p>
+          <p class="mt-2 text-3xl font-semibold text-on-surface">{{ percent(r.students[0]?.percentage) }}</p>
+          <p class="text-xs text-on-surface-variant">de asistencia</p>
         </a>
       } @empty {
-        <p class="text-sm text-gray-500">Aún no estás inscrito en cursos.</p>
+        <p class="text-sm text-on-surface-variant">Aún no estás inscrito en cursos.</p>
       }
     </section>
 
     <section class="card mt-6" aria-labelledby="history-title">
-      <h2 id="history-title" class="font-medium text-gray-900">Historial reciente</h2>
-      <ul class="mt-3 divide-y divide-gray-100">
+      <h2 id="history-title" class="font-medium text-on-surface">Historial reciente</h2>
+      <ul class="mt-3 divide-y divide-outline-variant/50">
         @for (a of history(); track a.id) {
           <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
             <span>
-              <span class="font-medium text-gray-900">{{ sessionTitle(a.sessionId) }}</span>
-              <span class="block text-xs text-gray-500">{{ courseName(a.courseId) }}</span>
+              <span class="font-medium text-on-surface">{{ sessionTitle(a.sessionId) }}</span>
+              <span class="block text-xs text-on-surface-variant">{{ courseName(a.courseId) }}</span>
             </span>
             <span class="flex items-center gap-2">
               <span [class]="badges[a.status]">{{ statusLabels[a.status] }}</span>
-              <span class="text-xs text-gray-500">{{ a.registeredAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
+              <span class="text-xs text-on-surface-variant">{{ a.registeredAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
             </span>
           </li>
         } @empty {
-          <li class="py-2 text-sm text-gray-500">Sin registros de asistencia.</li>
+          <li class="py-2 text-sm text-on-surface-variant">Sin registros de asistencia.</li>
         }
       </ul>
     </section>

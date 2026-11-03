@@ -25,6 +25,14 @@ service cloud.firestore {
     }
     function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
+    function sessionData(sessionId) { return get(/databases/$(database)/documents/sessions/$(sessionId)).data; }
+    function tokenData(tokenId) { return get(/databases/$(database)/documents/sessionTokens/$(tokenId)).data; }
+    // Modo demo sin Cloud Functions: el token del QR se valida con las reglas.
+    function tokenValid(tokenId, sessionId) {
+      let t = tokenData(tokenId);
+      return t.status == 'ACTIVE' && t.sessionId == sessionId && t.expiresAt > request.time;
+    }
+
     // ---------- users/{uid} ----------
     match /users/{uid} {
       allow get: if signedIn() && (
@@ -104,9 +112,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ---------- sessionTokens/{tokenId}: solo Cloud Functions ----------
+    // ---------- sessionTokens/{tokenId} ----------
+    // Modo demo: el docente genera el token del QR desde el panel. El estudiante inscrito solo
+    // puede LEER el token vigente (para validarlo al marcar asistencia), nunca su contenido sensible
+    // más allá de lo necesario. El token en claro nunca se guarda, solo su hash.
     match /sessionTokens/{tokenId} {
-      allow read, write: if false;
+      allow get: if isActive();
+      allow list: if isAdmin() || teaches(resource.data.courseId);
+      allow create: if (isAdmin() || teaches(request.resource.data.courseId))
+        && request.resource.data.status == 'ACTIVE'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.sessionId is string
+        && request.resource.data.tokenHash is string
+        && request.resource.data.expiresAt is timestamp;
+      // Solo revocar (al rotar o cerrar la sesión).
+      allow update: if (isAdmin() || teaches(resource.data.courseId))
+        && changedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'REVOKED';
+      allow delete: if false;
     }
 
     // ---------- attendances/{sessionId_studentId} ----------
@@ -115,20 +138,45 @@ service cloud.firestore {
         || teaches(resource.data.courseId)
         || (signedIn() && resource.data.studentId == request.auth.uid);
 
-      // Solo correcciones manuales con motivo. El registro por QR lo crea la Cloud Function.
-      allow create, update: if (isAdmin() || teaches(request.resource.data.courseId))
+      // Registro por QR (modo demo, sin Cloud Functions): el propio estudiante crea SU asistencia.
+      // Requisitos: id determinístico, está inscrito, la sesión está ACTIVE y en horario,
+      // el token del QR es válido, no existe registro previo, source=QR y no se tocan campos de corrección.
+      allow create: if isActive()
+        && request.resource.data.studentId == request.auth.uid
+        && attendanceId == request.resource.data.sessionId + '_' + request.auth.uid
+        && request.resource.data.source == 'QR'
+        && request.resource.data.status in ['PRESENT', 'LATE']
+        && request.resource.data.registeredAt == request.time
+        && request.resource.data.updatedBy == null
+        && request.resource.data.updateReason == null
+        && enrolledIn(request.resource.data.courseId)
+        && sessionData(request.resource.data.sessionId).courseId == request.resource.data.courseId
+        && sessionData(request.resource.data.sessionId).status == 'ACTIVE'
+        && sessionData(request.resource.data.sessionId).startsAt <= request.time
+        && sessionData(request.resource.data.sessionId).expiresAt >= request.time
+        && tokenValid(request.resource.data.tokenId, request.resource.data.sessionId);
+
+      // Corrección manual con motivo (docente del curso o ADMIN).
+      allow update: if (isAdmin() || teaches(request.resource.data.courseId))
         && attendanceId == request.resource.data.sessionId + '_' + request.resource.data.studentId
-        && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.courseId
-             == request.resource.data.courseId
+        && sessionData(request.resource.data.sessionId).courseId == request.resource.data.courseId
         && request.resource.data.status in ['PRESENT', 'LATE', 'ABSENT', 'JUSTIFIED']
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updateReason is string
         && request.resource.data.updateReason.size() > 0
-        && (resource == null || (
-          resource.data.courseId == request.resource.data.courseId
-          && resource.data.sessionId == request.resource.data.sessionId
-          && resource.data.studentId == request.resource.data.studentId
-        ));
+        && resource.data.courseId == request.resource.data.courseId
+        && resource.data.sessionId == request.resource.data.sessionId
+        && resource.data.studentId == request.resource.data.studentId;
+
+      // Corrección que crea el registro faltante (marcar a alguien sin asistencia).
+      allow create: if (isAdmin() || teaches(request.resource.data.courseId))
+        && attendanceId == request.resource.data.sessionId + '_' + request.resource.data.studentId
+        && sessionData(request.resource.data.sessionId).courseId == request.resource.data.courseId
+        && request.resource.data.status in ['PRESENT', 'LATE', 'ABSENT', 'JUSTIFIED']
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updateReason is string
+        && request.resource.data.updateReason.size() > 0;
+
       allow delete: if false;
     }
 
@@ -139,6 +187,38 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
+    }
+
+    // ---------- academicPeriods/{periodId}: ID = nombre (2026-I, 2026-II) ----------
+    match /academicPeriods/{periodId} {
+      allow read: if isActive();
+      allow create: if isAdmin()
+        && periodId.matches('^[0-9]{4}-(I|II)$')
+        && request.resource.data.name == periodId
+        && request.resource.data.status == 'PLANNED'
+        && request.resource.data.endsOn > request.resource.data.startsOn;
+      allow update: if isAdmin()
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.year == resource.data.year
+        && request.resource.data.term == resource.data.term
+        && request.resource.data.status in ['PLANNED', 'ACTIVE', 'CLOSED']
+        && request.resource.data.endsOn > request.resource.data.startsOn;
+      allow delete: if false;
+    }
+
+    // ---------- careers/{careerId} ----------
+    // Catálogo de carreras: lo leen usuarios activos; solo ADMIN lo administra. No se borra.
+    match /careers/{careerId} {
+      allow read: if isActive();
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.durationSemesters is int
+        && request.resource.data.durationSemesters >= 1
+        && request.resource.data.durationSemesters <= 12
+        && request.resource.data.status in ['ACTIVE', 'INACTIVE']
+        && (resource == null || request.resource.data.code == resource.data.code);
+      allow delete: if false;
     }
 
     // ---------- settings/{docId} ----------

@@ -6,6 +6,7 @@ import { catchError, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { ATTENDANCE_RULE_TEXT, ATTENDANCE_STATUS_BADGE, ATTENDANCE_STATUS_LABELS } from '../../core/models/attendance.model';
+import { semesterLabel } from '../../core/models/career.model';
 import { COURSE_STATUS_BADGE, COURSE_STATUS_LABELS, Course } from '../../core/models/course.model';
 import { SESSION_STATUS_BADGE, SESSION_STATUS_LABELS } from '../../core/models/session.model';
 import { fullName } from '../../core/models/user.model';
@@ -21,10 +22,10 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
   selector: 'app-course-detail',
   imports: [RouterLink, DatePipe, TsDatePipe, StatCard],
   template: `
-    <a routerLink="/courses" class="text-sm text-blue-600 hover:underline">← Volver a cursos</a>
+    <a routerLink="/courses" class="text-sm text-primary hover:underline">← Volver a cursos</a>
 
     @if (course() === undefined) {
-      <p class="mt-4 text-sm text-gray-500">Cargando…</p>
+      <p class="mt-4 text-sm text-on-surface-variant">Cargando…</p>
     } @else if (course() === null) {
       <p class="alert-error mt-4">El curso no existe o no tienes acceso.</p>
     } @else {
@@ -32,13 +33,22 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
       <div class="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 class="page-title">{{ c.name }}</h1>
-          <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+          <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
             <span class="font-mono">{{ c.courseCode }}</span>
+            @if (c.academicPeriodName) {
+              <span class="badge badge-gray">Periodo {{ c.academicPeriodName }}</span>
+            }
+            @if (c.careerName) {
+              <span class="badge badge-blue">{{ c.careerName }}</span>
+            }
+            @if (c.semester) {
+              <span>· {{ semesterLabel(c.semester) }}</span>
+            }
             <span>· Sección {{ c.section || '—' }}</span>
             <span [class]="courseBadge[c.status]">{{ courseStatus[c.status] }}</span>
           </p>
           @if (c.description) {
-            <p class="mt-2 max-w-2xl text-sm text-gray-700">{{ c.description }}</p>
+            <p class="mt-2 max-w-2xl text-sm text-on-surface">{{ c.description }}</p>
           }
         </div>
         @if (canManage()) {
@@ -59,12 +69,12 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
         <app-stat-card label="Asistencia general" [value]="percent(report()?.averagePercentage)"
           [hint]="(report()?.closedSessions ?? 0) + ' sesiones cerradas'" />
       </section>
-      <p class="mt-2 text-xs text-gray-500">{{ rule }}</p>
+      <p class="mt-2 text-xs text-on-surface-variant">{{ rule }}</p>
 
       <div class="mt-6 grid gap-4" [class.lg:grid-cols-2]="!isStudent()">
         @if (!isStudent()) {
           <section class="table-wrap" aria-labelledby="students-title">
-            <h2 id="students-title" class="px-4 pt-4 font-medium text-gray-900">Estudiantes inscritos</h2>
+            <h2 id="students-title" class="px-4 pt-4 font-medium text-on-surface">Estudiantes inscritos</h2>
             <table class="table mt-2">
               <thead>
                 <tr>
@@ -77,11 +87,11 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
                 @for (s of studentRows(); track s.studentId) {
                   <tr>
                     <td>{{ s.code || '—' }}</td>
-                    <td class="font-medium text-gray-900">{{ s.name }}</td>
-                    <td [class.text-red-700]="s.low">{{ percent(s.percentage) }}</td>
+                    <td class="font-medium text-on-surface">{{ s.name }}</td>
+                    <td [class.text-status-danger]="s.low">{{ percent(s.percentage) }}</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="3" class="text-center text-gray-500">Sin estudiantes inscritos.</td></tr>
+                  <tr><td colspan="3" class="text-center text-on-surface-variant">Sin estudiantes inscritos.</td></tr>
                 }
               </tbody>
             </table>
@@ -89,7 +99,7 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
         }
 
         <section class="table-wrap" aria-labelledby="sessions-title">
-          <h2 id="sessions-title" class="px-4 pt-4 font-medium text-gray-900">Sesiones recientes</h2>
+          <h2 id="sessions-title" class="px-4 pt-4 font-medium text-on-surface">Sesiones recientes</h2>
           <table class="table mt-2">
             <thead>
               <tr>
@@ -102,9 +112,9 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
             <tbody>
               @for (s of recentSessions(); track s.session.id) {
                 <tr>
-                  <td class="font-medium text-gray-900">
+                  <td class="font-medium text-on-surface">
                     @if (canManage()) {
-                      <a [routerLink]="['/live-attendance']" [queryParams]="{ sessionId: s.session.id }" class="text-blue-700 hover:underline">
+                      <a [routerLink]="['/live-attendance']" [queryParams]="{ sessionId: s.session.id }" class="text-primary hover:underline">
                         {{ s.session.title }}
                       </a>
                     } @else {
@@ -127,7 +137,7 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
                   </td>
                 </tr>
               } @empty {
-                <tr><td colspan="4" class="text-center text-gray-500">Sin sesiones.</td></tr>
+                <tr><td colspan="4" class="text-center text-on-surface-variant">Sin sesiones.</td></tr>
               }
             </tbody>
           </table>
@@ -145,6 +155,7 @@ export class CourseDetail {
   private readonly user = inject(AuthService).currentUser;
 
   protected readonly rule = ATTENDANCE_RULE_TEXT;
+  protected readonly semesterLabel = semesterLabel;
   protected readonly percent = percentLabel;
   protected readonly courseStatus = COURSE_STATUS_LABELS;
   protected readonly courseBadge = COURSE_STATUS_BADGE;

@@ -1,28 +1,47 @@
-<div class="mx-auto max-w-3xl">
-  <a routerLink="/users" class="text-sm text-blue-600 hover:underline">← Volver a usuarios</a>
-  <h1 class="page-title mt-2">Registrar usuario</h1>
-  <p class="page-subtitle">
-    Los campos con * son obligatorios. La contraseña la administra Firebase Authentication y no se guarda en Firestore.
-  </p>
+<div class="mx-auto max-w-4xl space-y-6">
+  <!-- Encabezado -->
+  <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+    <div>
+      <a routerLink="/users" class="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <app-icon [name]="icons.back" [size]="16" /> Volver a usuarios
+      </a>
+      <h1 class="page-title mt-2">Registrar usuario</h1>
+      <p class="page-subtitle">
+        Los campos con * son obligatorios. La contraseña la administra Firebase Authentication y no se guarda en Firestore.
+      </p>
+    </div>
+  </div>
 
-  <form (submit)="onSubmit($event)" novalidate class="mt-6 space-y-6" aria-describedby="form-status">
+  <form (submit)="onSubmit($event)" novalidate class="space-y-6" aria-describedby="form-status">
     <!-- Resumen de errores -->
-    <div id="form-status" aria-live="assertive">
+    <div id="form-status" aria-live="assertive" class="space-y-2 empty:hidden">
       @if (submitAttempted() && invalidCount() > 0) {
-        <p class="alert-error">Revisa {{ invalidCount() }} campo(s) marcados en rojo.</p>
+        <p class="alert-error flex items-center gap-2">
+          <app-icon [name]="icons.alert" /> Revisa {{ invalidCount() }} campo(s) marcados en rojo.
+        </p>
       }
       @for (msg of formErrors(); track msg) {
-        <p class="alert-error mt-2">{{ msg }}</p>
+        <p class="alert-error flex items-center gap-2"><app-icon [name]="icons.alert" /> {{ msg }}</p>
       }
     </div>
 
     <!-- ================= Datos personales ================= -->
-    <fieldset class="card">
-      <legend class="px-1 text-base font-semibold text-gray-900">Datos personales</legend>
-      <div class="mt-2 grid gap-4 sm:grid-cols-2">
+    <fieldset class="card p-0">
+      <legend class="sr-only">Datos personales</legend>
+      <div class="flex items-center gap-3 border-b border-outline-variant/50 px-6 py-4" aria-hidden="true">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+          <app-icon [name]="icons.personal" [size]="20" />
+        </span>
+        <div>
+          <p class="section-title">Datos personales</p>
+          <p class="text-xs text-on-surface-variant">Identidad y documento del usuario</p>
+        </div>
+      </div>
+      <div class="grid gap-5 p-6 sm:grid-cols-2">
         <div>
           <label for="firstName" class="label">Nombres *</label>
           <input id="firstName" [formField]="userForm.personal.firstName" autocomplete="off" class="input"
+            placeholder="Ana María"
             [attr.aria-invalid]="invalid(userForm.personal.firstName)" aria-describedby="firstName-msg" />
           <app-field-error [field]="userForm.personal.firstName" id="firstName-msg" />
         </div>
@@ -30,6 +49,7 @@
         <div>
           <label for="lastName" class="label">Apellidos *</label>
           <input id="lastName" [formField]="userForm.personal.lastName" autocomplete="off" class="input"
+            placeholder="López Ramírez"
             [attr.aria-invalid]="invalid(userForm.personal.lastName)" aria-describedby="lastName-msg" />
           <app-field-error [field]="userForm.personal.lastName" id="lastName-msg" />
         </div>
@@ -45,8 +65,8 @@
 
         <div>
           <label for="documentNumber" class="label">Número de documento *</label>
-          <input id="documentNumber" [formField]="userForm.personal.documentNumber" class="input"
-            [attr.inputmode]="isDni() ? 'numeric' : 'text'"
+          <input id="documentNumber" [formField]="userForm.personal.documentNumber" class="input font-mono"
+            [attr.inputmode]="isDni() ? 'numeric' : 'text'" [placeholder]="isDni() ? '12345678' : 'ABC123456'"
             [attr.aria-invalid]="invalid(userForm.personal.documentNumber)" aria-describedby="documentNumber-msg" />
           <app-field-error [field]="userForm.personal.documentNumber" id="documentNumber-msg" />
         </div>
@@ -73,37 +93,66 @@
     </fieldset>
 
     <!-- ================= Contacto ================= -->
-    <fieldset class="card">
-      <legend class="px-1 text-base font-semibold text-gray-900">Contacto</legend>
-      <div class="mt-2 grid gap-4 sm:grid-cols-2">
+    <fieldset class="card p-0">
+      <legend class="sr-only">Contacto</legend>
+      <div class="flex items-center gap-3 border-b border-outline-variant/50 px-6 py-4" aria-hidden="true">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+          <app-icon [name]="icons.contact" [size]="20" />
+        </span>
+        <div>
+          <p class="section-title">Contacto</p>
+          <p class="text-xs text-on-surface-variant">Correo de acceso y datos de contacto</p>
+        </div>
+      </div>
+      <div class="grid gap-5 p-6 sm:grid-cols-2">
         <div>
           <label for="email" class="label">Correo *</label>
-          <input id="email" type="email" [formField]="userForm.contact.email" autocomplete="off" class="input"
-            [attr.aria-invalid]="invalid(userForm.contact.email)" aria-describedby="email-msg" />
+          <div class="relative">
+            <app-icon [name]="icons.mail" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
+            <input id="email" type="email" [formField]="userForm.contact.email" autocomplete="off" class="input pl-11"
+              placeholder="usuario@institucion.edu.pe"
+              [attr.aria-invalid]="invalid(userForm.contact.email)" aria-describedby="email-msg" />
+          </div>
           <app-field-error [field]="userForm.contact.email" id="email-msg" />
         </div>
 
         <div>
           <label for="phone" class="label">Celular</label>
-          <input id="phone" type="tel" inputmode="numeric" placeholder="9XXXXXXXX"
-            [formField]="userForm.contact.phone" class="input"
-            [attr.aria-invalid]="invalid(userForm.contact.phone)" aria-describedby="phone-msg" />
+          <div class="relative">
+            <app-icon [name]="icons.phone" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
+            <input id="phone" type="tel" inputmode="numeric" placeholder="9XXXXXXXX"
+              [formField]="userForm.contact.phone" class="input pl-11"
+              [attr.aria-invalid]="invalid(userForm.contact.phone)" aria-describedby="phone-msg" />
+          </div>
           <app-field-error [field]="userForm.contact.phone" id="phone-msg" />
         </div>
 
         <div class="sm:col-span-2">
           <label for="address" class="label">Dirección</label>
-          <input id="address" [formField]="userForm.contact.address" autocomplete="off" class="input"
-            [attr.aria-invalid]="invalid(userForm.contact.address)" aria-describedby="address-msg" />
+          <div class="relative">
+            <app-icon [name]="icons.address" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
+            <input id="address" [formField]="userForm.contact.address" autocomplete="off" class="input pl-11"
+              placeholder="Av. Principal 123, Lima"
+              [attr.aria-invalid]="invalid(userForm.contact.address)" aria-describedby="address-msg" />
+          </div>
           <app-field-error [field]="userForm.contact.address" id="address-msg" />
         </div>
       </div>
     </fieldset>
 
     <!-- ================= Cuenta institucional ================= -->
-    <fieldset class="card">
-      <legend class="px-1 text-base font-semibold text-gray-900">Cuenta institucional</legend>
-      <div class="mt-2 grid gap-4 sm:grid-cols-2">
+    <fieldset class="card p-0">
+      <legend class="sr-only">Cuenta institucional</legend>
+      <div class="flex items-center gap-3 border-b border-outline-variant/50 px-6 py-4" aria-hidden="true">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+          <app-icon [name]="icons.account" [size]="20" />
+        </span>
+        <div>
+          <p class="section-title">Cuenta institucional</p>
+          <p class="text-xs text-on-surface-variant">Rol, estado y credenciales de acceso</p>
+        </div>
+      </div>
+      <div class="grid gap-5 p-6 sm:grid-cols-2">
         <div>
           <label for="role" class="label">Rol *</label>
           <select id="role" [formField]="userForm.account.role" class="input"
@@ -124,43 +173,63 @@
             }
           </select>
           <app-field-error [field]="userForm.account.status" id="status-msg"
-            hint="PENDING: no podrá iniciar sesión hasta ser validado." />
+            hint="Pendiente: no podrá iniciar sesión hasta ser validado." />
         </div>
 
-        <div>
-          <label for="institutionalCode" class="label">Código institucional {{ codeRequired() ? '*' : '' }}</label>
-          <input id="institutionalCode" [formField]="userForm.account.institutionalCode" class="input uppercase"
-            [placeholder]="codePlaceholder()"
-            [attr.aria-invalid]="invalid(userForm.account.institutionalCode)" aria-describedby="code-msg" />
-          <app-field-error [field]="userForm.account.institutionalCode" id="code-msg"
-            [hint]="codeRequired() ? undefined : 'Opcional para administradores.'" />
+        <div class="sm:col-span-2">
+          <label for="institutionalCode" class="label">Código institucional</label>
+          <div class="relative">
+            <app-icon [name]="icons.code" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-primary" />
+            <output id="institutionalCode" aria-describedby="code-msg" aria-live="polite"
+              class="input block bg-primary-fixed/50 pl-11 font-mono font-semibold text-primary">
+              {{ codePreview() }}
+            </output>
+          </div>
+          <p id="code-msg" class="hint">Se genera automáticamente: STU / TEA / ADM según el rol + número de documento.</p>
         </div>
-
-        <div class="hidden sm:block" aria-hidden="true"></div>
 
         <div>
           <label for="password" class="label">Contraseña *</label>
-          <input id="password" type="password" [formField]="userForm.account.password" autocomplete="new-password"
-            class="input" [attr.aria-invalid]="invalid(userForm.account.password)" aria-describedby="password-msg" />
+          <div class="relative">
+            <app-icon [name]="icons.lock" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
+            <input #pwd id="password" type="password" [formField]="userForm.account.password" autocomplete="new-password"
+              class="input pr-11 pl-11" placeholder="••••••••"
+              [attr.aria-invalid]="invalid(userForm.account.password)" aria-describedby="password-msg" />
+            <app-password-toggle [target]="pwd" />
+          </div>
           <app-field-error [field]="userForm.account.password" id="password-msg"
             hint="Mínimo 8 caracteres, con letras y números." />
         </div>
 
         <div>
           <label for="confirmPassword" class="label">Confirmar contraseña *</label>
-          <input id="confirmPassword" type="password" [formField]="userForm.account.confirmPassword"
-            autocomplete="new-password" class="input"
-            [attr.aria-invalid]="invalid(userForm.account.confirmPassword)" aria-describedby="confirm-msg" />
+          <div class="relative">
+            <app-icon [name]="icons.lock" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
+            <input #confirmPwd id="confirmPassword" type="password" [formField]="userForm.account.confirmPassword"
+              autocomplete="new-password" class="input pr-11 pl-11" placeholder="••••••••"
+              [attr.aria-invalid]="invalid(userForm.account.confirmPassword)" aria-describedby="confirm-msg" />
+            <app-password-toggle [target]="confirmPwd" />
+          </div>
           <app-field-error [field]="userForm.account.confirmPassword" id="confirm-msg" />
         </div>
       </div>
     </fieldset>
 
-    <div class="flex justify-end gap-3">
-      <a routerLink="/users" class="btn btn-secondary">Cancelar</a>
-      <button type="submit" class="btn btn-primary" [disabled]="userForm().submitting()">
-        {{ userForm().submitting() ? 'Guardando…' : 'Registrar' }}
-      </button>
+    <!-- Acciones -->
+    <div class="card flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-xs text-on-surface-variant">El registro quedará en la auditoría con tu usuario.</p>
+      <div class="flex justify-end gap-3">
+        <a routerLink="/users" class="btn btn-secondary">
+          <app-icon [name]="icons.cancel" /> Cancelar
+        </a>
+        <button type="submit" class="btn btn-primary" [disabled]="userForm().submitting()">
+          @if (userForm().submitting()) {
+            <app-icon [name]="icons.loader" class="animate-spin" /> Guardando…
+          } @else {
+            <app-icon [name]="icons.save" /> Registrar usuario
+          }
+        </button>
+      </div>
     </div>
   </form>
 </div>

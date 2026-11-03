@@ -74,16 +74,16 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
             <tr>
               <td class="whitespace-nowrap">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
               <td>{{ log.actorName || log.actorId }}</td>
-              <td class="font-medium text-gray-900">{{ actionLabel(log.action) }}</td>
+              <td class="font-medium text-on-surface">{{ actionLabel(log.action) }}</td>
               <td>
                 {{ entityLabel(log.entityType) }}
-                <span class="block font-mono text-xs text-gray-500 break-all">{{ log.entityId }}</span>
+                <span class="block font-mono text-xs text-on-surface-variant break-all">{{ log.entityId }}</span>
               </td>
               <td>{{ log.reason || '—' }}</td>
-              <td class="max-w-xs font-mono text-xs break-all text-gray-600">{{ details(log) }}</td>
+              <td class="max-w-xs font-mono text-xs break-all text-on-surface-variant">{{ details(log) }}</td>
             </tr>
           } @empty {
-            <tr><td colspan="6" class="text-center text-gray-500">Sin eventos.</td></tr>
+            <tr><td colspan="6" class="text-center text-on-surface-variant">Sin eventos.</td></tr>
           }
         </tbody>
       </table>

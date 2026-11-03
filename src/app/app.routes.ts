@@ -12,6 +12,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/auth/login').then((m) => m.Login),
     },
     {
+        path: 'descargar',
+        title: t('Descargar la app'),
+        loadComponent: () => import('./features/download/download').then((m) => m.Download),
+    },
+    {
         path: '',
         canActivate: [authGuard],
         loadComponent: () => import('./core/layout/dashboard-layout').then((m) => m.DashboardLayout),
@@ -41,6 +46,23 @@ export const routes: Routes = [
                 title: t('Detalle de usuario'),
                 canActivate: [roleGuard('ADMIN')],
                 loadComponent: () => import('./features/users/user-detail').then((m) => m.UserDetail),
+            },
+
+            // Periodos académicos (2026-I, 2026-II)
+            {
+                path: 'academic-periods',
+                title: t('Periodos académicos'),
+                canActivate: [roleGuard('ADMIN')],
+                loadComponent: () =>
+                    import('./features/academic-periods/academic-periods').then((m) => m.AcademicPeriods),
+            },
+
+            // Carreras del instituto
+            {
+                path: 'careers',
+                title: t('Carreras'),
+                canActivate: [roleGuard('ADMIN')],
+                loadComponent: () => import('./features/careers/careers').then((m) => m.Careers),
             },
 
             // Cursos (W05, W09)

@@ -34,7 +34,7 @@ export interface CreateSessionInput {
   lateAfterMinutes: number | null;
 }
 
-/** Respuesta de la Cloud Function que genera el token del QR. */
+/** Token temporal del QR (generado por el panel; solo se guarda su hash). */
 export interface SessionQrToken {
   token: string;
   expiresAt: number; // epoch ms

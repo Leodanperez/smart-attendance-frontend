@@ -15,9 +15,9 @@ export type FieldLike = () => Pick<FieldState<unknown>, 'touched' | 'invalid' | 
     @if (message(); as text) {
       <p [id]="id()" class="error">{{ text }}</p>
     } @else if (pending()) {
-      <p [id]="id()" class="mt-1 text-xs text-gray-500" aria-live="polite">Verificando…</p>
+      <p [id]="id()" class="mt-1 text-xs text-on-surface-variant" aria-live="polite">Verificando…</p>
     } @else if (hint()) {
-      <p [id]="id()" class="mt-1 text-xs text-gray-500">{{ hint() }}</p>
+      <p [id]="id()" class="mt-1 text-xs text-on-surface-variant">{{ hint() }}</p>
     }
   `,
 })

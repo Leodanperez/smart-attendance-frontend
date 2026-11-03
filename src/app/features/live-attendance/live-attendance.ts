@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { CircleCheck, Clock, Hourglass, Users, UserX } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 
 import {
@@ -24,8 +25,9 @@ import { SessionService } from '../../core/services/session.service';
 import { StatCard } from '../../shared/components/stat-card';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 import { downloadCsv, fileDate } from '../../shared/utils/csv';
-import { askReason } from '../../shared/utils/prompt';
+import { DialogService } from '../../shared/dialogs/dialog.service';
 import { SessionQr } from './session-qr';
+import { ToastService } from '../../shared/toast/toast.service';
 
 type RowStatus = AttendanceStatus | 'PENDING';
 
@@ -66,13 +68,23 @@ interface Row {
     @if (session(); as s) {
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">{{ s.title }}</h2>
-          <p class="text-sm text-gray-600">
+          <h2 class="text-lg font-semibold text-on-surface">{{ s.title }}</h2>
+          <p class="text-sm text-on-surface-variant">
             {{ courseName(s.courseId) }} · {{ s.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }} – {{ s.expiresAt | tsDate | date: 'HH:mm' }}
             @if (s.lateAfter) { · tardanza desde {{ s.lateAfter | tsDate | date: 'HH:mm' }} }
           </p>
         </div>
         <div class="flex items-center gap-2">
+          @if (s.status === 'ACTIVE') {
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-status-active/10 px-3 py-1 text-xs font-bold text-status-active"
+              role="status" aria-label="Actualización en tiempo real activa">
+              <span class="relative flex h-2.5 w-2.5" aria-hidden="true">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-active opacity-75"></span>
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-active"></span>
+              </span>
+              EN VIVO
+            </span>
+          }
           <span [class]="sessionBadge[s.status]">{{ sessionStatus[s.status] }}</span>
           @if (s.status === 'ACTIVE') {
             <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="close(s)">Cerrar sesión</button>
@@ -80,17 +92,23 @@ interface Row {
         </div>
       </div>
 
+      @if (s.status === 'ACTIVE') {
+        <p class="mt-2 text-sm text-on-surface-variant" aria-live="polite">
+          <strong class="text-status-active">{{ registeredCount() }}</strong> de {{ rows().length }} estudiantes han registrado su asistencia.
+        </p>
+      }
+
       <section class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Indicadores" aria-live="polite">
-        <app-stat-card label="Total inscritos" [value]="rows().length" />
-        <app-stat-card label="Presentes" [value]="count('PRESENT')" />
-        <app-stat-card label="Tardanzas" [value]="count('LATE')" />
-        <app-stat-card [label]="s.status === 'ACTIVE' ? 'Pendientes' : 'Sin registro'" [value]="count('PENDING')" />
-        <app-stat-card label="Faltas / justificadas" [value]="count('ABSENT') + ' / ' + count('JUSTIFIED')" />
+        <app-stat-card label="Total inscritos" [value]="rows().length" [icon]="icons.enrolled" />
+        <app-stat-card label="Presentes" [value]="count('PRESENT')" [icon]="icons.present" />
+        <app-stat-card label="Tardanzas" [value]="count('LATE')" [icon]="icons.late" />
+        <app-stat-card [label]="s.status === 'ACTIVE' ? 'Pendientes' : 'Sin registro'" [value]="count('PENDING')" [icon]="icons.pending" />
+        <app-stat-card label="Faltas / justificadas" [value]="count('ABSENT') + ' / ' + count('JUSTIFIED')" [icon]="icons.absent" />
       </section>
 
       <div class="mt-4 grid gap-4" [class.lg:grid-cols-3]="s.status === 'ACTIVE'">
         @if (s.status === 'ACTIVE') {
-          <app-session-qr [sessionId]="s.id" [active]="s.status === 'ACTIVE'" />
+          <app-session-qr [sessionId]="s.id" [courseId]="s.courseId" [active]="s.status === 'ACTIVE'" />
         }
 
         <section [class.lg:col-span-2]="s.status === 'ACTIVE'" aria-labelledby="table-title">
@@ -132,7 +150,7 @@ interface Row {
                 @for (r of filtered(); track r.studentId) {
                   <tr>
                     <td>{{ r.code || '—' }}</td>
-                    <td class="font-medium text-gray-900">{{ r.name }}</td>
+                    <td class="font-medium text-on-surface">{{ r.name }}</td>
                     <td class="whitespace-nowrap">{{ r.record?.registeredAt | tsDate | date: 'HH:mm:ss' }}</td>
                     <td>
                       @if (r.status === 'PENDING') {
@@ -141,7 +159,7 @@ interface Row {
                         <span [class]="statusBadge[r.status]">{{ statusLabels[r.status] }}</span>
                       }
                       @if (r.record?.updateReason) {
-                        <span class="block text-xs text-gray-500" [title]="r.record?.updateReason ?? ''">Corregida</span>
+                        <span class="block text-xs text-on-surface-variant" [title]="r.record?.updateReason ?? ''">Corregida</span>
                       }
                     </td>
                     <td>{{ r.record ? sourceLabels[r.record.source] || r.record.source : '—' }}</td>
@@ -159,7 +177,7 @@ interface Row {
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="6" class="text-center text-gray-500">Sin estudiantes inscritos.</td></tr>
+                  <tr><td colspan="6" class="text-center text-on-surface-variant">Sin estudiantes inscritos.</td></tr>
                 }
               </tbody>
             </table>
@@ -167,7 +185,7 @@ interface Row {
         </section>
       </div>
     } @else if (sessionId()) {
-      <p class="mt-4 text-sm text-gray-500">Cargando sesión… (si no carga, no tienes acceso a ella)</p>
+      <p class="mt-4 text-sm text-on-surface-variant">Cargando sesión… (si no carga, no tienes acceso a ella)</p>
     }
   `,
 })
@@ -178,8 +196,10 @@ export class LiveAttendance {
   protected readonly scope = inject(AcademicScopeService);
   private readonly sessionService = inject(SessionService);
   private readonly attendanceService = inject(AttendanceService);
+  private readonly dialogs = inject(DialogService);
   private readonly router = inject(Router);
 
+  protected readonly icons = { enrolled: Users, present: CircleCheck, late: Clock, pending: Hourglass, absent: UserX };
   protected readonly statuses = ATTENDANCE_STATUSES;
   protected readonly statusLabels = ATTENDANCE_STATUS_LABELS;
   protected readonly statusBadge = ATTENDANCE_STATUS_BADGE;
@@ -191,6 +211,7 @@ export class LiveAttendance {
   protected readonly search = signal('');
   protected readonly statusFilter = signal<RowStatus | ''>('');
   protected readonly busy = signal(false);
+  private readonly toast = inject(ToastService);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
 
@@ -220,11 +241,11 @@ export class LiveAttendance {
       switchMap((s) =>
         s
           ? this.attendanceService.getBySession(s).pipe(
-              catchError((e) => {
-                this.error.set(errorMessage(e));
-                return of([] as Attendance[]);
-              }),
-            )
+            catchError((e) => {
+              this.error.set(errorMessage(e));
+              return of([] as Attendance[]);
+            }),
+          )
           : of([] as Attendance[]),
       ),
     ),
@@ -276,6 +297,9 @@ export class LiveAttendance {
     return this.rows().filter((r) => r.status === status).length;
   }
 
+  /** Cuántos ya registraron (presente, tardanza o justificado), para el contador en vivo. */
+  protected readonly registeredCount = computed(() => this.rows().filter((r) => r.status !== 'PENDING' && r.status !== 'ABSENT').length);
+
   protected courseName(id: string): string {
     return courseLabel(this.courses().find((c) => c.id === id));
   }
@@ -289,7 +313,12 @@ export class LiveAttendance {
 
   async correct(session: ClassSession, row: Row, status: AttendanceStatus | ''): Promise<void> {
     if (!status) return;
-    const reason = askReason(`Motivo para marcar a ${row.name} como "${this.statusLabels[status]}":`);
+    const reason = await this.dialogs.reason({
+      title: 'Corregir asistencia',
+      message: `${row.name} quedará como "${this.statusLabels[status]}".`,
+      confirmText: 'Guardar corrección',
+      tone: 'warning',
+    });
     if (!reason) return;
     await this.run(async () => {
       await this.attendanceService.correct(session, row.studentId, status, reason, row.record);
@@ -298,7 +327,13 @@ export class LiveAttendance {
   }
 
   async close(session: ClassSession): Promise<void> {
-    if (!window.confirm(`¿Cerrar la sesión "${session.title}"?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Cerrar sesión de clase',
+      message: `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
+      confirmText: 'Cerrar sesión',
+      tone: 'danger',
+    });
+    if (!ok) return;
     await this.run(async () => {
       await this.sessionService.close(session);
       return 'Sesión cerrada.';
@@ -325,9 +360,10 @@ export class LiveAttendance {
     this.error.set(null);
     this.message.set(null);
     try {
-      this.message.set(await action());
+      const msg = await action();
+      if (msg) this.toast.success(msg);
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }

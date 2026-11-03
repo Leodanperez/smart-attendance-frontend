@@ -1,6 +1,6 @@
 {
   "name": "SmartAttendance - Modelo de datos Cloud Firestore",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "basedOn": [
     "01-diseno-pantallas-android.md",
     "02-arquitectura-app-y-firebase.md",
@@ -14,44 +14,126 @@
       "users": "UID de Firebase Authentication",
       "enrollments": "courseId_studentId (determinístico, evita duplicados)",
       "attendances": "sessionId_studentId (determinístico, una asistencia por estudiante y sesión)",
-      "others": "ID automático de Firestore"
+      "others": "ID automático de Firestore",
+      "academicPeriods": "Nombre del periodo: 2026-I, 2026-II (evita duplicados)"
     },
     "timestamps": "Toda fecha crítica es Timestamp generado en servidor (serverTimestamp / hora de la Cloud Function). Nunca la hora del teléfono.",
     "nulls": "Los campos opcionales se guardan como null (no se omiten) para que Android y Angular lean la misma forma.",
     "denormalization": "Campos marcados con denormalized=true son copias para mostrar sin joins (p. ej. el nombre del estudiante en la lista en vivo). Los escribe la Cloud Function o la operación que crea el documento; la fuente de verdad sigue siendo la colección original.",
     "secrets": "Nunca se guardan contraseñas, códigos de inscripción ni tokens QR en texto plano: solo su hash SHA-256 (hex, 64 caracteres)."
   },
-
   "enums": {
-    "UserRole": ["STUDENT", "TEACHER", "ADMIN"],
-    "UserStatus": ["PENDING", "ACTIVE", "DISABLED"],
-    "AuthProvider": ["password", "google.com"],
-    "DocumentType": ["DNI", "CE", "PASSPORT"],
-    "Gender": ["MALE", "FEMALE", "OTHER"],
-    "AcademicPeriodStatus": ["PLANNED", "ACTIVE", "CLOSED"],
-    "CourseStatus": ["ACTIVE", "INACTIVE"],
-    "EnrollmentStatus": ["ACTIVE", "DROPPED"],
-    "EnrollmentSource": ["CODE", "ADMIN"],
-    "EnrollmentCodeStatus": ["ACTIVE", "DISABLED"],
-    "SessionStatus": ["ACTIVE", "CLOSED"],
-    "SessionTokenStatus": ["ACTIVE", "REVOKED"],
-    "AttendanceStatus": ["PRESENT", "LATE", "ABSENT", "JUSTIFIED"],
-    "AttendanceSource": ["QR", "MANUAL", "SYSTEM"],
-    "AuditEntityType": ["USER", "COURSE", "ENROLLMENT", "ENROLLMENT_CODE", "SESSION", "ATTENDANCE", "SETTINGS"],
+    "UserRole": [
+      "STUDENT",
+      "TEACHER",
+      "ADMIN"
+    ],
+    "UserStatus": [
+      "PENDING",
+      "ACTIVE",
+      "DISABLED"
+    ],
+    "AuthProvider": [
+      "password",
+      "google.com"
+    ],
+    "DocumentType": [
+      "DNI",
+      "CE",
+      "PASSPORT"
+    ],
+    "Gender": [
+      "MALE",
+      "FEMALE",
+      "OTHER"
+    ],
+    "AcademicPeriodStatus": [
+      "PLANNED",
+      "ACTIVE",
+      "CLOSED"
+    ],
+    "CourseStatus": [
+      "ACTIVE",
+      "INACTIVE"
+    ],
+    "EnrollmentStatus": [
+      "ACTIVE",
+      "DROPPED"
+    ],
+    "EnrollmentSource": [
+      "CODE",
+      "ADMIN"
+    ],
+    "EnrollmentCodeStatus": [
+      "ACTIVE",
+      "DISABLED"
+    ],
+    "SessionStatus": [
+      "ACTIVE",
+      "CLOSED"
+    ],
+    "SessionTokenStatus": [
+      "ACTIVE",
+      "REVOKED"
+    ],
+    "AttendanceStatus": [
+      "PRESENT",
+      "LATE",
+      "ABSENT",
+      "JUSTIFIED"
+    ],
+    "AttendanceSource": [
+      "QR",
+      "MANUAL",
+      "SYSTEM"
+    ],
+    "AuditEntityType": [
+      "USER",
+      "CAREER",
+      "PERIOD",
+      "COURSE",
+      "ENROLLMENT",
+      "ENROLLMENT_CODE",
+      "SESSION",
+      "ATTENDANCE",
+      "SETTINGS"
+    ],
     "AuditAction": [
-      "USER_CREATED", "USER_UPDATED", "USER_STATUS_CHANGED", "USER_ROLE_CHANGED",
-      "COURSE_CREATED", "COURSE_UPDATED", "COURSE_STATUS_CHANGED",
-      "TEACHER_ASSIGNED", "TEACHER_REMOVED",
-      "ENROLLMENT_CREATED", "ENROLLMENT_DROPPED",
-      "ENROLLMENT_CODE_CREATED", "ENROLLMENT_CODE_DISABLED",
-      "SESSION_CREATED", "SESSION_CLOSED",
+      "USER_CREATED",
+      "USER_UPDATED",
+      "USER_STATUS_CHANGED",
+      "USER_ROLE_CHANGED",
+      "PERIOD_CLOSED",
+      "PERIOD_ACTIVATED",
+      "PERIOD_UPDATED",
+      "PERIOD_CREATED",
+      "CAREER_STATUS_CHANGED",
+      "CAREER_UPDATED",
+      "CAREER_CREATED",
+      "COURSE_CREATED",
+      "COURSE_UPDATED",
+      "COURSE_STATUS_CHANGED",
+      "TEACHER_ASSIGNED",
+      "TEACHER_REMOVED",
+      "ENROLLMENT_CREATED",
+      "ENROLLMENT_DROPPED",
+      "ENROLLMENT_CODE_CREATED",
+      "ENROLLMENT_CODE_DISABLED",
+      "SESSION_CREATED",
+      "SESSION_CLOSED",
       "ATTENDANCE_MANUALLY_UPDATED",
       "SETTINGS_UPDATED"
+    ],
+    "CareerStatus": [
+      "ACTIVE",
+      "INACTIVE"
+    ],
+    "PeriodTerm": [
+      1,
+      2
     ]
   },
-
   "collections": {
-
     "users": {
       "path": "users/{uid}",
       "description": "Perfil institucional. Uno por identidad de Firebase Authentication.",
@@ -61,26 +143,98 @@
         "El propio usuario: solo firstName, lastName, displayName, phone, address, photoUrl"
       ],
       "fields": {
-        "uid":               { "type": "string",         "required": true,  "description": "Igual al ID del documento y al UID de Auth" },
-        "firstName":         { "type": "string",         "required": true },
-        "lastName":          { "type": "string",         "required": true },
-        "displayName":       { "type": "string",         "required": true,  "description": "firstName + ' ' + lastName" },
-        "email":             { "type": "string",         "required": true,  "description": "En minúsculas" },
-        "photoUrl":          { "type": "string|null",    "required": true,  "description": "URL de Storage: profilePhotos/{uid}/avatar" },
-        "institutionalCode": { "type": "string|null",    "required": true,  "description": "Único. Ej: EST-0001, DOC-0001" },
-        "documentType":      { "type": "DocumentType|null", "required": true },
-        "documentNumber":    { "type": "string|null",    "required": true,  "description": "Único. DNI = 8 dígitos" },
-        "birthDate":         { "type": "string|null",    "required": true,  "description": "Formato YYYY-MM-DD (sin zona horaria)" },
-        "gender":            { "type": "Gender|null",    "required": true },
-        "phone":             { "type": "string|null",    "required": true,  "description": "9 dígitos, empieza con 9" },
-        "address":           { "type": "string|null",    "required": true },
-        "role":              { "type": "UserRole",       "required": true,  "description": "Solo lo modifica un ADMIN. Nunca el propio usuario." },
-        "status":            { "type": "UserStatus",     "required": true,  "description": "PENDING hasta validación institucional. Solo ACTIVE puede operar." },
-        "authProvider":      { "type": "AuthProvider",   "required": true },
-        "profileCompleted":  { "type": "boolean",        "required": true,  "description": "false => Android muestra A05 Completar perfil" },
-        "createdBy":         { "type": "string|null",    "required": true,  "description": "UID del ADMIN que lo registró; null si fue alta propia" },
-        "createdAt":         { "type": "timestamp",      "required": true },
-        "updatedAt":         { "type": "timestamp",      "required": true }
+        "uid": {
+          "type": "string",
+          "required": true,
+          "description": "Igual al ID del documento y al UID de Auth"
+        },
+        "firstName": {
+          "type": "string",
+          "required": true
+        },
+        "lastName": {
+          "type": "string",
+          "required": true
+        },
+        "displayName": {
+          "type": "string",
+          "required": true,
+          "description": "firstName + ' ' + lastName"
+        },
+        "email": {
+          "type": "string",
+          "required": true,
+          "description": "En minúsculas"
+        },
+        "photoUrl": {
+          "type": "string|null",
+          "required": true,
+          "description": "URL de Storage: profilePhotos/{uid}/avatar"
+        },
+        "institutionalCode": {
+          "type": "string|null",
+          "required": true,
+          "description": "Generado: STU-/TEA-/ADM- + documentNumber. Ej: STU-12345678. Cambia de prefijo si cambia el rol."
+        },
+        "documentType": {
+          "type": "DocumentType|null",
+          "required": true
+        },
+        "documentNumber": {
+          "type": "string|null",
+          "required": true,
+          "description": "Único. DNI = 8 dígitos"
+        },
+        "birthDate": {
+          "type": "string|null",
+          "required": true,
+          "description": "Formato YYYY-MM-DD (sin zona horaria)"
+        },
+        "gender": {
+          "type": "Gender|null",
+          "required": true
+        },
+        "phone": {
+          "type": "string|null",
+          "required": true,
+          "description": "9 dígitos, empieza con 9"
+        },
+        "address": {
+          "type": "string|null",
+          "required": true
+        },
+        "role": {
+          "type": "UserRole",
+          "required": true,
+          "description": "Solo lo modifica un ADMIN. Nunca el propio usuario."
+        },
+        "status": {
+          "type": "UserStatus",
+          "required": true,
+          "description": "PENDING hasta validación institucional. Solo ACTIVE puede operar."
+        },
+        "authProvider": {
+          "type": "AuthProvider",
+          "required": true
+        },
+        "profileCompleted": {
+          "type": "boolean",
+          "required": true,
+          "description": "false => Android muestra A05 Completar perfil"
+        },
+        "createdBy": {
+          "type": "string|null",
+          "required": true,
+          "description": "UID del ADMIN que lo registró; null si fue alta propia"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "uid": "uid-estudiante-01",
@@ -89,7 +243,7 @@
         "displayName": "Ana López",
         "email": "ana.lopez@example.edu.pe",
         "photoUrl": null,
-        "institutionalCode": "EST-0001",
+        "institutionalCode": "STU-00000001",
         "documentType": "DNI",
         "documentNumber": "00000001",
         "birthDate": "2005-04-12",
@@ -105,53 +259,218 @@
         "updatedAt": "SERVER_TIMESTAMP"
       }
     },
-
     "academicPeriods": {
       "path": "academicPeriods/{periodId}",
-      "description": "Periodo académico (filtro del dashboard W02). Opcional para la Semana Técnica; recomendado para uso real.",
-      "writtenBy": ["Angular (ADMIN)"],
+      "description": "Periodo académico (calendario). Dos por año: I = marzo–julio, II = agosto–diciembre. El ID es el nombre. Solo uno ACTIVE a la vez. Distinto del ciclo (nivel de la carrera).",
+      "writtenBy": [
+        "Angular (ADMIN)"
+      ],
       "fields": {
-        "name":      { "type": "string",               "required": true, "description": "Ej: 2026-II" },
-        "startsOn":  { "type": "string",               "required": true, "description": "YYYY-MM-DD" },
-        "endsOn":    { "type": "string",               "required": true, "description": "YYYY-MM-DD" },
-        "status":    { "type": "AcademicPeriodStatus", "required": true },
-        "createdAt": { "type": "timestamp",            "required": true },
-        "updatedAt": { "type": "timestamp",            "required": true }
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Igual al ID: 2026-I / 2026-II"
+        },
+        "year": {
+          "type": "number",
+          "required": true
+        },
+        "term": {
+          "type": "PeriodTerm",
+          "required": true,
+          "description": "1 = I, 2 = II"
+        },
+        "startsOn": {
+          "type": "string",
+          "required": true,
+          "description": "YYYY-MM-DD"
+        },
+        "endsOn": {
+          "type": "string",
+          "required": true,
+          "description": "YYYY-MM-DD, posterior a startsOn"
+        },
+        "status": {
+          "type": "AcademicPeriodStatus",
+          "required": true,
+          "description": "PLANNED → ACTIVE (en curso; cierra el anterior) → CLOSED (sus cursos pasan a INACTIVE; las asistencias se conservan)"
+        },
+        "createdBy": {
+          "type": "string",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "name": "2026-II",
-        "startsOn": "2026-08-17",
-        "endsOn": "2026-12-11",
+        "year": 2026,
+        "term": 2,
+        "startsOn": "2026-08-01",
+        "endsOn": "2026-12-20",
         "status": "ACTIVE",
+        "createdBy": "uid-admin-01",
         "createdAt": "SERVER_TIMESTAMP",
         "updatedAt": "SERVER_TIMESTAMP"
       }
     },
-
+    "careers": {
+      "path": "careers/{careerId}",
+      "description": "Carrera profesional del instituto. Cada curso pertenece a una carrera y a un semestre.",
+      "writtenBy": [
+        "Angular (ADMIN)"
+      ],
+      "fields": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Único. Ej: Desarrollo de Sistemas de Información"
+        },
+        "code": {
+          "type": "string",
+          "required": true,
+          "description": "Generado de las iniciales del nombre, único (DSI, DSI2…). No cambia."
+        },
+        "description": {
+          "type": "string",
+          "required": true,
+          "description": "Puede ser cadena vacía"
+        },
+        "durationSemesters": {
+          "type": "number",
+          "required": true,
+          "description": "Número de ciclos, entero 1..12. Técnica: 6 ciclos (3 años)"
+        },
+        "status": {
+          "type": "CareerStatus",
+          "required": true,
+          "description": "INACTIVE: no se elige en cursos nuevos; los cursos existentes no cambian"
+        },
+        "createdBy": {
+          "type": "string",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true
+        }
+      },
+      "example": {
+        "name": "Desarrollo de Sistemas de Información",
+        "code": "DSI",
+        "description": "Formación técnica en análisis, desarrollo y mantenimiento de software",
+        "durationSemesters": 6,
+        "status": "ACTIVE",
+        "createdBy": "uid-admin-01",
+        "createdAt": "SERVER_TIMESTAMP",
+        "updatedAt": "SERVER_TIMESTAMP"
+      }
+    },
     "courses": {
       "path": "courses/{courseId}",
-      "description": "Curso + sección. Cada combinación curso/sección es un documento distinto con su propio courseCode.",
-      "writtenBy": ["Angular (ADMIN)", "Cloud Functions (contador enrollmentCount)"],
+      "description": "Oferta de un curso: carrera + ciclo + periodo académico + sección. Cada periodo tiene sus propios documentos de curso; los de periodos cerrados quedan como historial.",
+      "writtenBy": [
+        "Angular (ADMIN)",
+        "Cloud Functions (contador enrollmentCount)"
+      ],
       "fields": {
-        "name":             { "type": "string",        "required": true },
-        "description":      { "type": "string",        "required": true, "description": "Puede ser cadena vacía" },
-        "courseCode":       { "type": "string",        "required": true, "description": "Único, en MAYÚSCULAS. Ej: DS-2026-01" },
-        "section":          { "type": "string",        "required": true, "description": "Ej: A" },
-        "academicPeriodId": { "type": "string|null",   "required": true, "description": "Ref. a academicPeriods" },
-        "teacherIds":       { "type": "array<string>", "required": true, "description": "UIDs de docentes asignados. Base de la regla 'el docente solo ve sus cursos'." },
-        "enrollmentCount":  { "type": "number",        "required": true, "denormalized": true, "description": "Inscripciones ACTIVE. Lo mantiene una Cloud Function." },
-        "status":           { "type": "CourseStatus",  "required": true },
-        "createdBy":        { "type": "string",        "required": true },
-        "createdAt":        { "type": "timestamp",     "required": true },
-        "updatedAt":        { "type": "timestamp",     "required": true }
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "required": true,
+          "description": "Puede ser cadena vacía"
+        },
+        "courseCode": {
+          "type": "string",
+          "required": true,
+          "description": "Generado al crear: INICIALES-AÑO-NNNN (aleatorio, único). Ej: IGS-2026-4821. No cambia al editar."
+        },
+        "academicPeriodId": {
+          "type": "string",
+          "required": true,
+          "description": "Ref. a academicPeriods (p. ej. 2026-II)"
+        },
+        "academicPeriodName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true,
+          "description": "Copia: 2026-II"
+        },
+        "careerId": {
+          "type": "string",
+          "required": true,
+          "description": "Ref. a careers"
+        },
+        "careerName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true,
+          "description": "Copia del nombre de la carrera; se actualiza al renombrarla"
+        },
+        "semester": {
+          "type": "number",
+          "required": true,
+          "description": "Ciclo de la carrera (nivel del plan de estudios): 1..careers.durationSemesters. En la interfaz se muestra como \"V ciclo\"."
+        },
+        "section": {
+          "type": "string",
+          "required": true,
+          "description": "Ej: A"
+        },
+        "teacherIds": {
+          "type": "array<string>",
+          "required": true,
+          "description": "UIDs de docentes asignados. Base de la regla 'el docente solo ve sus cursos'."
+        },
+        "enrollmentCount": {
+          "type": "number",
+          "required": true,
+          "denormalized": true,
+          "description": "Inscripciones ACTIVE. Lo mantiene una Cloud Function."
+        },
+        "status": {
+          "type": "CourseStatus",
+          "required": true
+        },
+        "createdBy": {
+          "type": "string",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "name": "Desarrollo de Sistemas",
         "description": "Curso de desarrollo de aplicaciones",
-        "courseCode": "DS-2026-01",
+        "courseCode": "DSS-2026-4821",
+        "academicPeriodId": "2026-II",
+        "academicPeriodName": "2026-II",
+        "careerId": "career-dsi",
+        "careerName": "Desarrollo de Sistemas de Información",
+        "semester": 6,
         "section": "A",
-        "academicPeriodId": "period-2026-II",
-        "teacherIds": ["uid-docente-01"],
+        "teacherIds": [
+          "uid-docente-01"
+        ],
         "enrollmentCount": 12,
         "status": "ACTIVE",
         "createdBy": "uid-admin-01",
@@ -159,7 +478,6 @@
         "updatedAt": "SERVER_TIMESTAMP"
       }
     },
-
     "enrollments": {
       "path": "enrollments/{courseId}_{studentId}",
       "description": "Matrícula de un estudiante en un curso. ID determinístico para impedir duplicados.",
@@ -168,23 +486,62 @@
         "Angular (ADMIN): inscripción manual y retiro"
       ],
       "fields": {
-        "courseId":      { "type": "string",           "required": true },
-        "studentId":     { "type": "string",           "required": true },
-        "studentName":   { "type": "string",           "required": true, "denormalized": true, "description": "Para listas del docente sin leer users" },
-        "studentCode":   { "type": "string|null",      "required": true, "denormalized": true, "description": "institutionalCode del estudiante" },
-        "status":        { "type": "EnrollmentStatus", "required": true },
-        "source":        { "type": "EnrollmentSource", "required": true },
-        "enrollmentCodeId": { "type": "string|null",   "required": true, "description": "Código usado, si source=CODE" },
-        "enrolledAt":    { "type": "timestamp",        "required": true },
-        "enrolledBy":    { "type": "string",           "required": true, "description": "UID del estudiante (CODE) o del ADMIN" },
-        "droppedAt":     { "type": "timestamp|null",   "required": true },
-        "droppedReason": { "type": "string|null",      "required": true }
+        "courseId": {
+          "type": "string",
+          "required": true
+        },
+        "studentId": {
+          "type": "string",
+          "required": true
+        },
+        "studentName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true,
+          "description": "Para listas del docente sin leer users"
+        },
+        "studentCode": {
+          "type": "string|null",
+          "required": true,
+          "denormalized": true,
+          "description": "institutionalCode del estudiante"
+        },
+        "status": {
+          "type": "EnrollmentStatus",
+          "required": true
+        },
+        "source": {
+          "type": "EnrollmentSource",
+          "required": true
+        },
+        "enrollmentCodeId": {
+          "type": "string|null",
+          "required": true,
+          "description": "Código usado, si source=CODE"
+        },
+        "enrolledAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "enrolledBy": {
+          "type": "string",
+          "required": true,
+          "description": "UID del estudiante (CODE) o del ADMIN"
+        },
+        "droppedAt": {
+          "type": "timestamp|null",
+          "required": true
+        },
+        "droppedReason": {
+          "type": "string|null",
+          "required": true
+        }
       },
       "example": {
         "courseId": "course-ds-01",
         "studentId": "uid-estudiante-01",
         "studentName": "Ana López",
-        "studentCode": "EST-0001",
+        "studentCode": "STU-00000001",
         "status": "ACTIVE",
         "source": "CODE",
         "enrollmentCodeId": "code-01",
@@ -194,21 +551,52 @@
         "droppedReason": null
       }
     },
-
     "enrollmentCodes": {
       "path": "enrollmentCodes/{codeId}",
       "description": "Código para que el estudiante se una a un curso (A08). Solo se guarda el hash; el código se muestra una vez al generarlo.",
-      "writtenBy": ["Angular (ADMIN): crear y desactivar", "Cloud Function redeemEnrollmentCode: uses, lastUsedAt"],
+      "writtenBy": [
+        "Angular (ADMIN): crear y desactivar",
+        "Cloud Function redeemEnrollmentCode: uses, lastUsedAt"
+      ],
       "fields": {
-        "courseId":   { "type": "string",               "required": true },
-        "codeHash":   { "type": "string",               "required": true, "description": "SHA-256 hex del código en MAYÚSCULAS" },
-        "status":     { "type": "EnrollmentCodeStatus", "required": true },
-        "expiresAt":  { "type": "timestamp",            "required": true },
-        "maxUses":    { "type": "number",               "required": true },
-        "uses":       { "type": "number",               "required": true, "description": "Lo incrementa solo la Cloud Function en una transacción" },
-        "lastUsedAt": { "type": "timestamp|null",       "required": true },
-        "createdBy":  { "type": "string",               "required": true },
-        "createdAt":  { "type": "timestamp",            "required": true }
+        "courseId": {
+          "type": "string",
+          "required": true
+        },
+        "codeHash": {
+          "type": "string",
+          "required": true,
+          "description": "SHA-256 hex del código en MAYÚSCULAS"
+        },
+        "status": {
+          "type": "EnrollmentCodeStatus",
+          "required": true
+        },
+        "expiresAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "maxUses": {
+          "type": "number",
+          "required": true
+        },
+        "uses": {
+          "type": "number",
+          "required": true,
+          "description": "Lo incrementa solo la Cloud Function en una transacción"
+        },
+        "lastUsedAt": {
+          "type": "timestamp|null",
+          "required": true
+        },
+        "createdBy": {
+          "type": "string",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "courseId": "course-ds-01",
@@ -222,44 +610,104 @@
         "createdAt": "SERVER_TIMESTAMP"
       }
     },
-
     "sessions": {
       "path": "sessions/{sessionId}",
       "description": "Sesión de clase con asistencia. Solo con status=ACTIVE y dentro de startsAt..expiresAt se acepta el QR.",
-      "writtenBy": ["Angular / Android (docente del curso o ADMIN)", "Cloud Functions: contadores stats"],
+      "writtenBy": [
+        "Angular / Android (docente del curso o ADMIN)",
+        "Cloud Functions: contadores stats"
+      ],
       "fields": {
-        "courseId":        { "type": "string",         "required": true },
-        "courseName":      { "type": "string",         "required": true, "denormalized": true },
-        "courseCode":      { "type": "string",         "required": true, "denormalized": true },
-        "title":           { "type": "string",         "required": true },
-        "teacherId":       { "type": "string",         "required": true, "description": "Docente que creó la sesión" },
-        "teacherName":     { "type": "string",         "required": true, "denormalized": true },
-        "status":          { "type": "SessionStatus",  "required": true },
-        "startsAt":        { "type": "timestamp",      "required": true },
-        "expiresAt":       { "type": "timestamp",      "required": true, "description": "startsAt + duración" },
-        "durationMinutes": { "type": "number",         "required": true },
-        "lateAfter":       { "type": "timestamp|null", "required": true, "description": "Desde esta hora el registro QR queda como LATE. null = sin tardanza" },
+        "courseId": {
+          "type": "string",
+          "required": true
+        },
+        "courseName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true
+        },
+        "courseCode": {
+          "type": "string",
+          "required": true,
+          "denormalized": true
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "teacherId": {
+          "type": "string",
+          "required": true,
+          "description": "Docente que creó la sesión"
+        },
+        "teacherName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true
+        },
+        "status": {
+          "type": "SessionStatus",
+          "required": true
+        },
+        "startsAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "expiresAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "startsAt + duración"
+        },
+        "durationMinutes": {
+          "type": "number",
+          "required": true
+        },
+        "lateAfter": {
+          "type": "timestamp|null",
+          "required": true,
+          "description": "Desde esta hora el registro QR queda como LATE. null = sin tardanza"
+        },
         "stats": {
           "type": "map",
           "required": true,
           "denormalized": true,
           "description": "Contadores en vivo para el proyector (04 §3). Los actualiza registerAttendance en la misma transacción.",
           "fields": {
-            "enrolled":  { "type": "number" },
-            "present":   { "type": "number" },
-            "late":      { "type": "number" },
-            "absent":    { "type": "number" },
-            "justified": { "type": "number" }
+            "enrolled": {
+              "type": "number"
+            },
+            "present": {
+              "type": "number"
+            },
+            "late": {
+              "type": "number"
+            },
+            "absent": {
+              "type": "number"
+            },
+            "justified": {
+              "type": "number"
+            }
           }
         },
-        "createdAt": { "type": "timestamp",      "required": true },
-        "closedAt":  { "type": "timestamp|null", "required": true },
-        "closedBy":  { "type": "string|null",    "required": true }
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "closedAt": {
+          "type": "timestamp|null",
+          "required": true
+        },
+        "closedBy": {
+          "type": "string|null",
+          "required": true
+        }
       },
       "example": {
         "courseId": "course-ds-01",
         "courseName": "Desarrollo de Sistemas",
-        "courseCode": "DS-2026-01",
+        "courseCode": "DSS-2026-4821",
         "title": "Demostración Semana Técnica",
         "teacherId": "uid-docente-01",
         "teacherName": "Carlos Ramírez",
@@ -268,25 +716,56 @@
         "expiresAt": "2026-11-20T11:30:00-05:00",
         "durationMinutes": 90,
         "lateAfter": "2026-11-20T10:15:00-05:00",
-        "stats": { "enrolled": 12, "present": 8, "late": 1, "absent": 0, "justified": 0 },
+        "stats": {
+          "enrolled": 12,
+          "present": 8,
+          "late": 1,
+          "absent": 0,
+          "justified": 0
+        },
         "createdAt": "SERVER_TIMESTAMP",
         "closedAt": null,
         "closedBy": null
       }
     },
-
     "sessionTokens": {
       "path": "sessionTokens/{tokenId}",
       "description": "Token opaco y temporal que va dentro del QR (A16). Sin datos personales. Se rota cada ~60 s. Ningún cliente lo lee ni escribe.",
-      "writtenBy": ["Solo Cloud Function generateSessionToken"],
+      "writtenBy": [
+        "Solo Cloud Function generateSessionToken"
+      ],
       "fields": {
-        "sessionId": { "type": "string",             "required": true },
-        "courseId":  { "type": "string",             "required": true },
-        "tokenHash": { "type": "string",             "required": true, "description": "SHA-256 hex del token. El token en claro solo viaja al docente." },
-        "status":    { "type": "SessionTokenStatus", "required": true, "description": "REVOKED al rotar o al cerrar la sesión" },
-        "expiresAt": { "type": "timestamp",          "required": true, "description": "createdAt + 60 s (configurable en settings)" },
-        "createdBy": { "type": "string",             "required": true },
-        "createdAt": { "type": "timestamp",          "required": true }
+        "sessionId": {
+          "type": "string",
+          "required": true
+        },
+        "courseId": {
+          "type": "string",
+          "required": true
+        },
+        "tokenHash": {
+          "type": "string",
+          "required": true,
+          "description": "SHA-256 hex del token. El token en claro solo viaja al docente."
+        },
+        "status": {
+          "type": "SessionTokenStatus",
+          "required": true,
+          "description": "REVOKED al rotar o al cerrar la sesión"
+        },
+        "expiresAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "createdAt + 60 s (configurable en settings)"
+        },
+        "createdBy": {
+          "type": "string",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "sessionId": "session-001",
@@ -298,7 +777,6 @@
         "createdAt": "SERVER_TIMESTAMP"
       }
     },
-
     "attendances": {
       "path": "attendances/{sessionId}_{studentId}",
       "description": "Una asistencia por estudiante y sesión. El panel la escucha en tiempo real.",
@@ -308,25 +786,68 @@
         "Docente del curso / ADMIN: corrección con motivo (source se conserva, updatedBy + updateReason)"
       ],
       "fields": {
-        "sessionId":    { "type": "string",           "required": true },
-        "courseId":     { "type": "string",           "required": true, "description": "Necesario para reglas y reportes por curso" },
-        "studentId":    { "type": "string",           "required": true },
-        "studentName":  { "type": "string",           "required": true, "denormalized": true, "description": "Aparece al instante en la lista en vivo" },
-        "studentCode":  { "type": "string|null",      "required": true, "denormalized": true },
-        "status":       { "type": "AttendanceStatus", "required": true },
-        "source":       { "type": "AttendanceSource", "required": true },
-        "registeredAt": { "type": "timestamp",        "required": true, "description": "Hora del servidor" },
-        "tokenId":      { "type": "string|null",      "required": true, "description": "Token QR usado (trazabilidad)" },
-        "updatedBy":    { "type": "string|null",      "required": true },
-        "updateReason": { "type": "string|null",      "required": true, "description": "Obligatorio en correcciones manuales" },
-        "updatedAt":    { "type": "timestamp|null",   "required": true }
+        "sessionId": {
+          "type": "string",
+          "required": true
+        },
+        "courseId": {
+          "type": "string",
+          "required": true,
+          "description": "Necesario para reglas y reportes por curso"
+        },
+        "studentId": {
+          "type": "string",
+          "required": true
+        },
+        "studentName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true,
+          "description": "Aparece al instante en la lista en vivo"
+        },
+        "studentCode": {
+          "type": "string|null",
+          "required": true,
+          "denormalized": true
+        },
+        "status": {
+          "type": "AttendanceStatus",
+          "required": true
+        },
+        "source": {
+          "type": "AttendanceSource",
+          "required": true
+        },
+        "registeredAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Hora del servidor"
+        },
+        "tokenId": {
+          "type": "string|null",
+          "required": true,
+          "description": "Token QR usado (trazabilidad)"
+        },
+        "updatedBy": {
+          "type": "string|null",
+          "required": true
+        },
+        "updateReason": {
+          "type": "string|null",
+          "required": true,
+          "description": "Obligatorio en correcciones manuales"
+        },
+        "updatedAt": {
+          "type": "timestamp|null",
+          "required": true
+        }
       },
       "example": {
         "sessionId": "session-001",
         "courseId": "course-ds-01",
         "studentId": "uid-estudiante-01",
         "studentName": "Ana López",
-        "studentCode": "EST-0001",
+        "studentCode": "STU-00000001",
         "status": "PRESENT",
         "source": "QR",
         "registeredAt": "SERVER_TIMESTAMP",
@@ -336,20 +857,48 @@
         "updatedAt": null
       }
     },
-
     "auditLogs": {
       "path": "auditLogs/{logId}",
       "description": "Bitácora inmutable de operaciones sensibles (W13). Nadie la edita ni la borra.",
-      "writtenBy": ["Cloud Functions", "Angular en el mismo batch que la operación auditada (actorId = usuario autenticado)"],
+      "writtenBy": [
+        "Cloud Functions",
+        "Angular en el mismo batch que la operación auditada (actorId = usuario autenticado)"
+      ],
       "fields": {
-        "actorId":    { "type": "string",          "required": true },
-        "actorName":  { "type": "string",          "required": true, "denormalized": true },
-        "action":     { "type": "AuditAction",     "required": true },
-        "entityType": { "type": "AuditEntityType", "required": true },
-        "entityId":   { "type": "string",          "required": true },
-        "reason":     { "type": "string|null",     "required": true },
-        "details":    { "type": "map|null",        "required": true, "description": "Solo datos permitidos (p. ej. {from, to}). Nunca códigos, tokens ni contraseñas." },
-        "createdAt":  { "type": "timestamp",       "required": true }
+        "actorId": {
+          "type": "string",
+          "required": true
+        },
+        "actorName": {
+          "type": "string",
+          "required": true,
+          "denormalized": true
+        },
+        "action": {
+          "type": "AuditAction",
+          "required": true
+        },
+        "entityType": {
+          "type": "AuditEntityType",
+          "required": true
+        },
+        "entityId": {
+          "type": "string",
+          "required": true
+        },
+        "reason": {
+          "type": "string|null",
+          "required": true
+        },
+        "details": {
+          "type": "map|null",
+          "required": true,
+          "description": "Solo datos permitidos (p. ej. {from, to}). Nunca códigos, tokens ni contraseñas."
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "actorId": "uid-docente-01",
@@ -358,25 +907,60 @@
         "entityType": "ATTENDANCE",
         "entityId": "session-001_uid-estudiante-01",
         "reason": "Corrección autorizada: llegó con justificación médica",
-        "details": { "from": "ABSENT", "to": "JUSTIFIED" },
+        "details": {
+          "from": "ABSENT",
+          "to": "JUSTIFIED"
+        },
         "createdAt": "SERVER_TIMESTAMP"
       }
     },
-
     "settings": {
       "path": "settings/general",
       "description": "Configuración institucional única. La leen todos los usuarios activos; la edita ADMIN.",
-      "writtenBy": ["Angular (ADMIN)"],
+      "writtenBy": [
+        "Angular (ADMIN)"
+      ],
       "fields": {
-        "institutionName":         { "type": "string",      "required": true },
-        "currentAcademicPeriodId": { "type": "string|null", "required": true },
-        "defaultSessionMinutes":   { "type": "number",      "required": true },
-        "defaultLateAfterMinutes": { "type": "number",      "required": true },
-        "lowAttendanceThreshold":  { "type": "number",      "required": true, "description": "% para el reporte de bajo porcentaje" },
-        "qrRefreshSeconds":        { "type": "number",      "required": true, "description": "Vida del token QR" },
-        "allowedEmailDomains":     { "type": "array<string>", "required": true, "description": "Ej: ['example.edu.pe']. Vacío = cualquiera" },
-        "updatedBy":               { "type": "string",      "required": true },
-        "updatedAt":               { "type": "timestamp",   "required": true }
+        "institutionName": {
+          "type": "string",
+          "required": true
+        },
+        "currentAcademicPeriodId": {
+          "type": "string|null",
+          "required": true,
+          "description": "Opcional. El panel usa el periodo con status ACTIVE como periodo en curso."
+        },
+        "defaultSessionMinutes": {
+          "type": "number",
+          "required": true
+        },
+        "defaultLateAfterMinutes": {
+          "type": "number",
+          "required": true
+        },
+        "lowAttendanceThreshold": {
+          "type": "number",
+          "required": true,
+          "description": "% para el reporte de bajo porcentaje"
+        },
+        "qrRefreshSeconds": {
+          "type": "number",
+          "required": true,
+          "description": "Vida del token QR"
+        },
+        "allowedEmailDomains": {
+          "type": "array<string>",
+          "required": true,
+          "description": "Ej: ['example.edu.pe']. Vacío = cualquiera"
+        },
+        "updatedBy": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true
+        }
       },
       "example": {
         "institutionName": "Instituto SmartAttendance",
@@ -391,97 +975,445 @@
       }
     }
   },
-
   "relationships": [
-    { "from": "courses.teacherIds[]",           "to": "users (role=TEACHER)", "type": "N:M" },
-    { "from": "courses.academicPeriodId",       "to": "academicPeriods",      "type": "N:1" },
-    { "from": "enrollments.courseId",           "to": "courses",              "type": "N:1" },
-    { "from": "enrollments.studentId",          "to": "users (role=STUDENT)", "type": "N:1" },
-    { "from": "enrollmentCodes.courseId",       "to": "courses",              "type": "N:1" },
-    { "from": "sessions.courseId",              "to": "courses",              "type": "N:1" },
-    { "from": "sessions.teacherId",             "to": "users (role=TEACHER)", "type": "N:1" },
-    { "from": "sessionTokens.sessionId",        "to": "sessions",             "type": "N:1" },
-    { "from": "attendances.sessionId",          "to": "sessions",             "type": "N:1" },
-    { "from": "attendances.studentId",          "to": "users (role=STUDENT)", "type": "N:1" },
-    { "from": "auditLogs.actorId",              "to": "users",                "type": "N:1" }
+    {
+      "from": "courses.academicPeriodId",
+      "to": "academicPeriods",
+      "type": "N:1"
+    },
+    {
+      "from": "courses.careerId",
+      "to": "careers",
+      "type": "N:1"
+    },
+    {
+      "from": "courses.teacherIds[]",
+      "to": "users (role=TEACHER)",
+      "type": "N:M"
+    },
+    {
+      "from": "enrollments.courseId",
+      "to": "courses",
+      "type": "N:1"
+    },
+    {
+      "from": "enrollments.studentId",
+      "to": "users (role=STUDENT)",
+      "type": "N:1"
+    },
+    {
+      "from": "enrollmentCodes.courseId",
+      "to": "courses",
+      "type": "N:1"
+    },
+    {
+      "from": "sessions.courseId",
+      "to": "courses",
+      "type": "N:1"
+    },
+    {
+      "from": "sessions.teacherId",
+      "to": "users (role=TEACHER)",
+      "type": "N:1"
+    },
+    {
+      "from": "sessionTokens.sessionId",
+      "to": "sessions",
+      "type": "N:1"
+    },
+    {
+      "from": "attendances.sessionId",
+      "to": "sessions",
+      "type": "N:1"
+    },
+    {
+      "from": "attendances.studentId",
+      "to": "users (role=STUDENT)",
+      "type": "N:1"
+    },
+    {
+      "from": "auditLogs.actorId",
+      "to": "users",
+      "type": "N:1"
+    }
   ],
-
   "cloudFunctions": {
     "redeemEnrollmentCode": {
       "type": "callable",
-      "input": { "code": "string" },
-      "output": { "courseId": "string", "courseName": "string" },
-      "validates": ["usuario ACTIVE y STUDENT", "hash del código", "status ACTIVE", "no vencido", "uses < maxUses", "curso ACTIVE", "no inscrito ya"],
-      "writes": ["enrollments/{courseId}_{uid}", "enrollmentCodes.uses (+1, transacción)", "courses.enrollmentCount (+1)", "auditLogs"]
+      "input": {
+        "code": "string"
+      },
+      "output": {
+        "courseId": "string",
+        "courseName": "string"
+      },
+      "validates": [
+        "usuario ACTIVE y STUDENT",
+        "hash del código",
+        "status ACTIVE",
+        "no vencido",
+        "uses < maxUses",
+        "curso ACTIVE",
+        "no inscrito ya"
+      ],
+      "writes": [
+        "enrollments/{courseId}_{uid}",
+        "enrollmentCodes.uses (+1, transacción)",
+        "courses.enrollmentCount (+1)",
+        "auditLogs"
+      ]
     },
     "generateSessionToken": {
       "type": "callable",
-      "input": { "sessionId": "string" },
-      "output": { "token": "string", "expiresAt": "number (epoch ms)" },
-      "validates": ["usuario ACTIVE", "docente asignado al curso o ADMIN", "sesión ACTIVE y no vencida"],
-      "writes": ["sessionTokens (nuevo, ACTIVE)", "sessionTokens anteriores de la sesión -> REVOKED"]
+      "input": {
+        "sessionId": "string"
+      },
+      "output": {
+        "token": "string",
+        "expiresAt": "number (epoch ms)"
+      },
+      "validates": [
+        "usuario ACTIVE",
+        "docente asignado al curso o ADMIN",
+        "sesión ACTIVE y no vencida"
+      ],
+      "writes": [
+        "sessionTokens (nuevo, ACTIVE)",
+        "sessionTokens anteriores de la sesión -> REVOKED"
+      ]
     },
     "registerAttendance": {
       "type": "callable",
-      "input": { "token": "string" },
-      "output": { "status": "PRESENT|LATE", "courseName": "string", "sessionTitle": "string", "registeredAt": "number (epoch ms)" },
-      "validates": ["usuario ACTIVE y STUDENT", "hash del token ACTIVE y no vencido", "sesión ACTIVE y dentro de horario", "inscripción ACTIVE", "no existe attendances/{sessionId}_{uid}"],
-      "writes": ["attendances/{sessionId}_{uid} (transacción, create-only)", "sessions.stats (+1 present/late)"],
-      "errors": ["TOKEN_EXPIRED", "SESSION_CLOSED", "NOT_ENROLLED", "ALREADY_REGISTERED", "USER_NOT_ACTIVE"]
+      "input": {
+        "token": "string"
+      },
+      "output": {
+        "status": "PRESENT|LATE",
+        "courseName": "string",
+        "sessionTitle": "string",
+        "registeredAt": "number (epoch ms)"
+      },
+      "validates": [
+        "usuario ACTIVE y STUDENT",
+        "hash del token ACTIVE y no vencido",
+        "sesión ACTIVE y dentro de horario",
+        "inscripción ACTIVE",
+        "no existe attendances/{sessionId}_{uid}"
+      ],
+      "writes": [
+        "attendances/{sessionId}_{uid} (transacción, create-only)",
+        "sessions.stats (+1 present/late)"
+      ],
+      "errors": [
+        "TOKEN_EXPIRED",
+        "SESSION_CLOSED",
+        "NOT_ENROLLED",
+        "ALREADY_REGISTERED",
+        "USER_NOT_ACTIVE"
+      ]
     },
     "onSessionClosed": {
       "type": "firestore trigger (sessions/{sessionId} status ACTIVE -> CLOSED)",
-      "writes": ["sessionTokens -> REVOKED", "attendances ABSENT (source=SYSTEM) para inscritos sin registro", "sessions.stats"]
+      "writes": [
+        "sessionTokens -> REVOKED",
+        "attendances ABSENT (source=SYSTEM) para inscritos sin registro",
+        "sessions.stats"
+      ]
     },
     "onEnrollmentWrite": {
       "type": "firestore trigger (enrollments/{id})",
-      "writes": ["courses.enrollmentCount"]
+      "writes": [
+        "courses.enrollmentCount"
+      ]
     }
   },
-
   "indexes": {
     "description": "Índices compuestos para las consultas previstas en Android (02 §12). El panel Angular actual solo usa igualdades y no requiere índices compuestos.",
     "firestore.indexes.json": {
       "indexes": [
-        { "collectionGroup": "enrollments", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "studentId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] },
-        { "collectionGroup": "enrollments", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "courseId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] },
-        { "collectionGroup": "sessions", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "courseId", "order": "ASCENDING" }, { "fieldPath": "startsAt", "order": "DESCENDING" } ] },
-        { "collectionGroup": "sessions", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "teacherId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] },
-        { "collectionGroup": "attendances", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "studentId", "order": "ASCENDING" }, { "fieldPath": "registeredAt", "order": "DESCENDING" } ] },
-        { "collectionGroup": "attendances", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "sessionId", "order": "ASCENDING" }, { "fieldPath": "registeredAt", "order": "ASCENDING" } ] },
-        { "collectionGroup": "attendances", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "courseId", "order": "ASCENDING" }, { "fieldPath": "registeredAt", "order": "DESCENDING" } ] },
-        { "collectionGroup": "sessionTokens", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "sessionId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] }
+        {
+          "collectionGroup": "enrollments",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "studentId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "status",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "enrollments",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "courseId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "status",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "sessions",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "courseId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "startsAt",
+              "order": "DESCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "sessions",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "teacherId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "status",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "attendances",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "studentId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "registeredAt",
+              "order": "DESCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "attendances",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "sessionId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "registeredAt",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "attendances",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "courseId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "registeredAt",
+              "order": "DESCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "sessionTokens",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "sessionId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "status",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "courses",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "careerId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "semester",
+              "order": "ASCENDING"
+            }
+          ]
+        },
+        {
+          "collectionGroup": "courses",
+          "queryScope": "COLLECTION",
+          "fields": [
+            {
+              "fieldPath": "academicPeriodId",
+              "order": "ASCENDING"
+            },
+            {
+              "fieldPath": "status",
+              "order": "ASCENDING"
+            }
+          ]
+        }
       ],
       "fieldOverrides": []
     }
   },
-
   "accessSummary": {
-    "users":           { "STUDENT": "lee y edita datos básicos propios", "TEACHER": "lee perfiles de estudiantes y docentes", "ADMIN": "todo (no puede cambiar su propio rol/estado)" },
-    "academicPeriods": { "STUDENT": "lee", "TEACHER": "lee", "ADMIN": "todo" },
-    "courses":         { "STUDENT": "lee cursos donde está inscrito", "TEACHER": "lee cursos asignados", "ADMIN": "todo" },
-    "enrollments":     { "STUDENT": "lee las suyas", "TEACHER": "lee las de sus cursos", "ADMIN": "todo" },
-    "enrollmentCodes": { "STUDENT": "sin acceso (usa la Function)", "TEACHER": "sin acceso", "ADMIN": "crea y desactiva" },
-    "sessions":        { "STUDENT": "lee las de sus cursos", "TEACHER": "crea y cierra en sus cursos", "ADMIN": "todo" },
-    "sessionTokens":   { "STUDENT": "sin acceso", "TEACHER": "sin acceso (usa la Function)", "ADMIN": "sin acceso" },
-    "attendances":     { "STUDENT": "lee las suyas", "TEACHER": "lee y corrige con motivo en sus cursos", "ADMIN": "lee y corrige con motivo" },
-    "auditLogs":       { "STUDENT": "sin acceso", "TEACHER": "solo crea (junto a su corrección)", "ADMIN": "lee" },
-    "settings":        { "STUDENT": "lee", "TEACHER": "lee", "ADMIN": "edita" }
+    "careers": {
+      "STUDENT": "lee",
+      "TEACHER": "lee",
+      "ADMIN": "crea, edita y activa/desactiva (no se borra)"
+    },
+    "users": {
+      "STUDENT": "lee y edita datos básicos propios",
+      "TEACHER": "lee perfiles de estudiantes y docentes",
+      "ADMIN": "todo (no puede cambiar su propio rol/estado)"
+    },
+    "academicPeriods": {
+      "STUDENT": "lee",
+      "TEACHER": "lee",
+      "ADMIN": "crea, edita fechas, inicia y cierra (no se borra)"
+    },
+    "courses": {
+      "STUDENT": "lee cursos donde está inscrito",
+      "TEACHER": "lee cursos asignados",
+      "ADMIN": "todo"
+    },
+    "enrollments": {
+      "STUDENT": "lee las suyas",
+      "TEACHER": "lee las de sus cursos",
+      "ADMIN": "todo"
+    },
+    "enrollmentCodes": {
+      "STUDENT": "sin acceso (usa la Function)",
+      "TEACHER": "sin acceso",
+      "ADMIN": "crea y desactiva"
+    },
+    "sessions": {
+      "STUDENT": "lee las de sus cursos",
+      "TEACHER": "crea y cierra en sus cursos",
+      "ADMIN": "todo"
+    },
+    "sessionTokens": {
+      "STUDENT": "sin acceso",
+      "TEACHER": "sin acceso (usa la Function)",
+      "ADMIN": "sin acceso"
+    },
+    "attendances": {
+      "STUDENT": "lee las suyas",
+      "TEACHER": "lee y corrige con motivo en sus cursos",
+      "ADMIN": "lee y corrige con motivo"
+    },
+    "auditLogs": {
+      "STUDENT": "sin acceso",
+      "TEACHER": "solo crea (junto a su corrección)",
+      "ADMIN": "lee"
+    },
+    "settings": {
+      "STUDENT": "lee",
+      "TEACHER": "lee",
+      "ADMIN": "edita"
+    }
   },
-
   "demoSeed": {
     "description": "Datos ficticios para la Semana Técnica (04 §7). No usar datos personales reales.",
     "users": [
-      { "uid": "uid-admin-01",   "firstName": "Admin",  "lastName": "Demo",    "email": "admin@example.edu.pe",    "role": "ADMIN",   "status": "ACTIVE", "institutionalCode": "ADM-0001" },
-      { "uid": "uid-docente-01", "firstName": "Carlos", "lastName": "Ramírez", "email": "docente@example.edu.pe",  "role": "TEACHER", "status": "ACTIVE", "institutionalCode": "DOC-0001" },
-      { "uid": "uid-estudiante-01", "firstName": "Ana", "lastName": "López",   "email": "est01@example.edu.pe",    "role": "STUDENT", "status": "ACTIVE", "institutionalCode": "EST-0001" },
-      { "note": "Repetir estudiantes hasta EST-0015" }
+      {
+        "uid": "uid-admin-01",
+        "firstName": "Admin",
+        "lastName": "Demo",
+        "email": "admin@example.edu.pe",
+        "role": "ADMIN",
+        "status": "ACTIVE",
+        "institutionalCode": "ADM-00000099"
+      },
+      {
+        "uid": "uid-docente-01",
+        "firstName": "Carlos",
+        "lastName": "Ramírez",
+        "email": "docente@example.edu.pe",
+        "role": "TEACHER",
+        "status": "ACTIVE",
+        "institutionalCode": "TEA-00000098"
+      },
+      {
+        "uid": "uid-estudiante-01",
+        "firstName": "Ana",
+        "lastName": "López",
+        "email": "est01@example.edu.pe",
+        "role": "STUDENT",
+        "status": "ACTIVE",
+        "institutionalCode": "STU-00000001"
+      },
+      {
+        "note": "Repetir estudiantes hasta 15 (STU-<DNI>)"
+      }
     ],
     "courses": [
-      { "id": "course-ds-01", "name": "Desarrollo de Sistemas", "courseCode": "DS-2026-01", "section": "A", "teacherIds": ["uid-docente-01"], "status": "ACTIVE" }
+      {
+        "id": "course-ds-01",
+        "name": "Desarrollo de Sistemas",
+        "courseCode": "DSS-2026-4821",
+        "section": "A",
+        "teacherIds": [
+          "uid-docente-01"
+        ],
+        "status": "ACTIVE",
+        "careerId": "career-dsi",
+        "careerName": "Desarrollo de Sistemas de Información",
+        "semester": 6,
+        "academicPeriodId": "2026-II",
+        "academicPeriodName": "2026-II"
+      }
     ],
     "sessions": [
-      { "courseId": "course-ds-01", "title": "Demostración Semana Técnica", "teacherId": "uid-docente-01", "status": "ACTIVE", "durationMinutes": 90 }
+      {
+        "courseId": "course-ds-01",
+        "title": "Demostración Semana Técnica",
+        "teacherId": "uid-docente-01",
+        "status": "ACTIVE",
+        "durationMinutes": 90
+      }
+    ],
+    "careers": [
+      {
+        "id": "career-dsi",
+        "name": "Desarrollo de Sistemas de Información",
+        "code": "DSI",
+        "durationSemesters": 6,
+        "status": "ACTIVE"
+      }
+    ],
+    "academicPeriods": [
+      {
+        "id": "2026-I",
+        "startsOn": "2026-03-01",
+        "endsOn": "2026-07-31",
+        "status": "CLOSED"
+      },
+      {
+        "id": "2026-II",
+        "startsOn": "2026-08-01",
+        "endsOn": "2026-12-20",
+        "status": "ACTIVE"
+      }
     ]
   }
 }

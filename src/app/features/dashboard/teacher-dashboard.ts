@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { BookOpen, ChartColumn, CircleCheck, GraduationCap, Radio } from 'lucide-angular';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { courseLabel } from '../../core/models/course.model';
@@ -33,19 +34,19 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 
     <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Indicadores">
       @for (stat of stats(); track stat.label) {
-        <app-stat-card [label]="stat.label" [value]="stat.value" />
+        <app-stat-card [label]="stat.label" [value]="stat.value" [icon]="stat.icon" />
       }
     </section>
 
     <div class="mt-6 grid gap-4 lg:grid-cols-2">
       <section class="card" aria-labelledby="active-title">
-        <h2 id="active-title" class="font-medium text-gray-900">Sesiones activas</h2>
-        <ul class="mt-3 divide-y divide-gray-100">
+        <h2 id="active-title" class="font-medium text-on-surface">Sesiones activas</h2>
+        <ul class="mt-3 divide-y divide-outline-variant/50">
           @for (s of activeSessions(); track s.id) {
             <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <span>
-                <span class="font-medium text-gray-900">{{ s.title }}</span>
-                <span class="block text-xs text-gray-500">
+                <span class="font-medium text-on-surface">{{ s.title }}</span>
+                <span class="block text-xs text-on-surface-variant">
                   {{ courseName(s.courseId) }} · {{ s.startsAt | tsDate | date: 'dd/MM HH:mm' }}
                 </span>
               </span>
@@ -54,19 +55,19 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
               </a>
             </li>
           } @empty {
-            <li class="py-2 text-sm text-gray-500">No hay sesiones activas.</li>
+            <li class="py-2 text-sm text-on-surface-variant">No hay sesiones activas.</li>
           }
         </ul>
       </section>
 
       <section class="card" aria-labelledby="courses-title">
-        <h2 id="courses-title" class="font-medium text-gray-900">Mis cursos</h2>
-        <ul class="mt-3 divide-y divide-gray-100">
+        <h2 id="courses-title" class="font-medium text-on-surface">Mis cursos</h2>
+        <ul class="mt-3 divide-y divide-outline-variant/50">
           @for (r of reports(); track r.course.id) {
             <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <span>
-                <span class="font-medium text-gray-900">{{ label(r.course) }}</span>
-                <span class="block text-xs text-gray-500">
+                <span class="font-medium text-on-surface">{{ label(r.course) }}</span>
+                <span class="block text-xs text-on-surface-variant">
                   {{ r.students.length }} estudiantes · asistencia {{ percent(r.averagePercentage) }}
                 </span>
               </span>
@@ -78,7 +79,7 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
               </span>
             </li>
           } @empty {
-            <li class="py-2 text-sm text-gray-500">No tienes cursos asignados.</li>
+            <li class="py-2 text-sm text-on-surface-variant">No tienes cursos asignados.</li>
           }
         </ul>
       </section>
@@ -122,11 +123,11 @@ export class TeacherDashboard {
       this.enrollments().filter((e) => e.status === 'ACTIVE').map((e) => e.studentId),
     ).length;
     return [
-      { label: 'Mis cursos', value: this.reports().length },
-      { label: 'Estudiantes inscritos', value: students },
-      { label: 'Sesiones activas', value: this.activeSessions().length },
-      { label: 'Asistencias de hoy', value: todayCount },
-      { label: 'Promedio de asistencia', value: percentLabel(this.reportService.overall(this.reports())) },
+      { label: 'Mis cursos', value: this.reports().length, icon: BookOpen },
+      { label: 'Estudiantes inscritos', value: students, icon: GraduationCap },
+      { label: 'Sesiones activas', value: this.activeSessions().length, icon: Radio },
+      { label: 'Asistencias de hoy', value: todayCount, icon: CircleCheck },
+      { label: 'Promedio de asistencia', value: percentLabel(this.reportService.overall(this.reports())), icon: ChartColumn },
     ];
   });
 

@@ -8,6 +8,20 @@ import {
 } from '@angular/core';
 import { FieldTree, FormField, TreeValidationResult, form, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
+import {
+  ArrowLeft,
+  CircleAlert,
+  Hash,
+  IdCard,
+  LoaderCircle,
+  Lock,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  ShieldCheck,
+  X,
+} from 'lucide-angular';
 
 import {
   DOCUMENT_TYPES,
@@ -18,11 +32,16 @@ import {
   USER_ROLES,
   USER_STATUSES,
   USER_STATUS_LABELS,
+  ROLE_CODE_PREFIX,
+  buildInstitutionalCode,
 } from '../../../core/models/user.model';
 import { errorMessage } from '../../../core/services/error-message';
 import { UserService } from '../../../core/services/user.service';
 import { FieldError, showInvalid } from '../../../shared/components/field-error';
-import { CODE_PREFIX, UserFormModel, initialUserForm, toCreateUserInput } from './user-form.model';
+import { Icon } from '../../../shared/components/icon';
+import { PasswordToggle } from '../../../shared/components/password-toggle';
+import { ToastService } from '../../../shared/toast/toast.service';
+import { UserFormModel, initialUserForm, toCreateUserInput } from './user-form.model';
 import { userFormSchema } from './user-form.schema';
 
 /**
@@ -33,12 +52,13 @@ import { userFormSchema } from './user-form.schema';
  */
 @Component({
   selector: 'app-user-form',
-  imports: [FormField, RouterLink, FieldError],
+  imports: [FormField, RouterLink, FieldError, Icon, PasswordToggle],
   templateUrl: './user-form.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UserForm {
   private readonly userService = inject(UserService);
+  private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -52,6 +72,21 @@ export class UserForm {
   protected readonly genderLabels = GENDER_LABELS;
   protected readonly documentTypeLabels = DOCUMENT_TYPE_LABELS;
   protected readonly invalid = showInvalid;
+  protected readonly icons = {
+    back: ArrowLeft,
+    alert: CircleAlert,
+    personal: IdCard,
+    contact: Mail,
+    account: ShieldCheck,
+    code: Hash,
+    mail: Mail,
+    phone: Phone,
+    address: MapPin,
+    lock: Lock,
+    save: Save,
+    cancel: X,
+    loader: LoaderCircle,
+  };
 
   /** Modelo del formulario. */
   protected readonly model = signal<UserFormModel>(initialUserForm());
@@ -66,10 +101,12 @@ export class UserForm {
 
   // Estado derivado
   protected readonly isDni = computed(() => this.userForm.personal.documentType().value() === 'DNI');
-  protected readonly codeRequired = computed(() => this.userForm.account.role().value() !== 'ADMIN');
-  protected readonly codePlaceholder = computed(() => {
+  /** Vista previa del código que se generará: STU-/TEA-/ADM- + número de documento. */
+  protected readonly codePreview = computed(() => {
     const role = this.userForm.account.role().value();
-    return `${role ? CODE_PREFIX[role] : 'EST-'}0001`;
+    const doc = this.userForm.personal.documentNumber().value();
+    if (role) return buildInstitutionalCode(role, doc) ?? `${ROLE_CODE_PREFIX[role]}-DOCUMENTO`;
+    return doc.trim() ? `ROL-${doc.trim().toUpperCase()}` : 'Elige un rol e ingresa el documento';
   });
   /** Errores del servidor sin campo asociado. */
   protected readonly formErrors = computed(() =>
@@ -87,7 +124,9 @@ export class UserForm {
     await submit(this.userForm, {
       action: async (fields) => {
         try {
-          const uid = await this.userService.createUser(toCreateUserInput(fields().value()));
+          const input = toCreateUserInput(fields().value());
+          const uid = await this.userService.createUser(input);
+          this.toast.success(`${input.firstName} ${input.lastName} · ${this.codePreview()}`, { title: 'Usuario registrado' });
           await this.router.navigate(['/users', uid]);
           return null;
         } catch (error) {
@@ -101,12 +140,13 @@ export class UserForm {
   /** Traduce errores de Firebase a errores del formulario, en el campo que corresponda. */
   private toFormErrors(error: unknown, fields: FieldTree<UserFormModel>): TreeValidationResult {
     const message = errorMessage(error);
+    this.toast.error(message, { title: 'No se pudo registrar' });
     const code = (error as { code?: string } | null)?.code;
     const fieldByCode: Record<string, FieldTree<string>> = {
       'auth/email-already-in-use': fields.contact.email,
       'auth/invalid-email': fields.contact.email,
       'app/document-in-use': fields.personal.documentNumber,
-      'app/institutional-code-in-use': fields.account.institutionalCode,
+      'app/institutional-code-in-use': fields.personal.documentNumber,
       'auth/weak-password': fields.account.password,
     };
     const target = code ? fieldByCode[code] : undefined;

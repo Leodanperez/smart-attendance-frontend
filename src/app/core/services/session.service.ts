@@ -11,23 +11,23 @@ import {
   where,
   writeBatch,
 } from '@angular/fire/firestore';
-import { Functions, httpsCallable } from '@angular/fire/functions';
+import { addDoc, getDocs, limit } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { ClassSession, CreateSessionInput, SessionQrToken } from '../models/session.model';
 import { AuditService } from './audit.service';
+import { randomCode, sha256Hex } from './crypto.utils';
 import { combineLists, tsMillis } from './firestore.utils';
 
 const byStartDesc = (a: ClassSession, b: ClassSession) => tsMillis(b.startsAt) - tsMillis(a.startsAt);
 
-/** Nombre de la callable que genera el token del QR (ver flujo 9 del modelo). */
-export const QR_TOKEN_FUNCTION = 'generateSessionToken';
+/** Vigencia por defecto del token del QR. */
+const DEFAULT_QR_SECONDS = 60;
 
 @Injectable({ providedIn: 'root' })
 export class SessionService {
   private readonly firestore = inject(Firestore);
-  private readonly functions = inject(Functions);
   private readonly injector = inject(EnvironmentInjector);
   private readonly auth = inject(AuthService);
   private readonly audit = inject(AuditService);
@@ -114,19 +114,45 @@ export class SessionService {
   }
 
   /**
-   * El token del QR lo genera el backend (Cloud Function): aleatorio, temporal y guardado como hash.
-   * Angular nunca genera este token.
+   * Genera un token temporal para el QR y guarda solo su hash en sessionTokens.
+   * Sin Cloud Functions (modo demo, plan gratuito): lo crea el panel del docente.
+   * El token en claro se devuelve una vez para dibujar el QR; nunca se guarda.
    */
-  async requestQrToken(sessionId: string): Promise<SessionQrToken> {
-    const callable = this.run(() =>
-      httpsCallable<{ sessionId: string }, { token: string; expiresAt: number | string }>(
-        this.functions,
-        QR_TOKEN_FUNCTION,
+  async requestQrToken(sessionId: string, courseId: string, qrSeconds = DEFAULT_QR_SECONDS): Promise<SessionQrToken> {
+    const token = randomCode(10);
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = Date.now() + qrSeconds * 1000;
+    await this.run(() =>
+      addDoc(collection(this.firestore, 'sessionTokens'), {
+        sessionId,
+        courseId,
+        tokenHash,
+        status: 'ACTIVE',
+        expiresAt: Timestamp.fromMillis(expiresAt),
+        createdBy: this.auth.currentUser()?.uid ?? null,
+        createdAt: serverTimestamp(),
+      }),
+    );
+    return { token, expiresAt };
+  }
+
+  /** Lo que se codifica en el QR: sesión + token, en una línea compacta. */
+  buildQrPayload(sessionId: string, token: string): string {
+    return `SA1|${sessionId}|${token}`;
+  }
+
+  /** Comprueba si existe un token ACTIVE y vigente para la sesión (diagnóstico opcional). */
+  async hasActiveToken(sessionId: string): Promise<boolean> {
+    const snap = await this.run(() =>
+      getDocs(
+        query(
+          collection(this.firestore, 'sessionTokens'),
+          where('sessionId', '==', sessionId),
+          where('status', '==', 'ACTIVE'),
+          limit(1),
+        ),
       ),
     );
-    const { data } = await callable({ sessionId });
-    const expiresAt =
-      typeof data.expiresAt === 'number' ? data.expiresAt : new Date(data.expiresAt).getTime();
-    return { token: data.token, expiresAt };
+    return !snap.empty;
   }
 }

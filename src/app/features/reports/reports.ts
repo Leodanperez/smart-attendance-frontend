@@ -18,6 +18,7 @@ import { DateRange, ReportService, inRange, percentLabel } from '../../core/serv
 import { SettingsService } from '../../core/services/settings.service';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 import { downloadCsv, fileDate } from '../../shared/utils/csv';
+import { PeriodFilter } from '../../shared/utils/period-filter';
 
 type Tab = 'course' | 'student' | 'session' | 'low' | 'records';
 
@@ -42,12 +43,22 @@ const TABS: { id: Tab; label: string }[] = [
       <button type="button" class="btn btn-primary" (click)="exportCsv()">Exportar CSV</button>
     </div>
 
-    <section class="card mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Filtros">
+    <section class="card mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Filtros">
+      <div>
+        <label for="f-period" class="label">Periodo académico</label>
+        <select id="f-period" class="input" #pe [value]="periodFilter.periodId()"
+          (change)="periodFilter.periodId.set(pe.value); courseId.set('')">
+          <option value="">Todos</option>
+          @for (p of periodFilter.periods(); track p.id) {
+            <option [value]="p.id">{{ p.name }}{{ p.status === 'ACTIVE' ? ' (en curso)' : '' }}</option>
+          }
+        </select>
+      </div>
       <div>
         <label for="f-course" class="label">Curso</label>
         <select id="f-course" class="input" #c [value]="courseId()" (change)="courseId.set(c.value)">
           <option value="">Todos</option>
-          @for (course of courses(); track course.id) {
+          @for (course of periodCourses(); track course.id) {
             <option [value]="course.id">{{ label(course) }}</option>
           }
         </select>
@@ -84,11 +95,11 @@ const TABS: { id: Tab; label: string }[] = [
       <p role="alert" class="alert-error mt-4">{{ scope.error() }}</p>
     }
 
-    <div class="mt-4 flex flex-wrap gap-1 border-b border-gray-200" role="tablist" aria-label="Tipo de reporte">
+    <div class="mt-4 flex flex-wrap gap-1 border-b border-outline-variant" role="tablist" aria-label="Tipo de reporte">
       @for (t of tabs; track t.id) {
         <button type="button" role="tab" [attr.aria-selected]="tab() === t.id" (click)="tab.set(t.id)"
           class="-mb-px border-b-2 px-3 py-2 text-sm"
-          [class]="tab() === t.id ? 'border-blue-600 font-medium text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900'">
+          [class]="tab() === t.id ? 'border-primary font-medium text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'">
           {{ t.label }}
         </button>
       }
@@ -105,13 +116,13 @@ const TABS: { id: Tab; label: string }[] = [
             <tbody>
               @for (r of courseRows(); track r.course.id) {
                 <tr>
-                  <td class="font-medium text-gray-900">{{ label(r.course) }}</td>
+                  <td class="font-medium text-on-surface">{{ label(r.course) }}</td>
                   <td>{{ r.students.length }}</td>
                   <td>{{ r.closedSessions }}</td>
                   <td>{{ r.attended }}/{{ r.denominator }}</td>
                   <td>{{ percent(r.averagePercentage) }}</td>
                 </tr>
-              } @empty { <tr><td colspan="5" class="text-center text-gray-500">Sin datos.</td></tr> }
+              } @empty { <tr><td colspan="5" class="text-center text-on-surface-variant">Sin datos.</td></tr> }
             </tbody>
           </table>
         }
@@ -119,7 +130,7 @@ const TABS: { id: Tab; label: string }[] = [
           <ng-container *ngTemplateOutlet="studentTable; context: { rows: studentRows() }" />
         }
         @case ('low') {
-          <p class="px-4 pt-3 text-sm text-gray-600">Estudiantes por debajo de {{ threshold() }}% de asistencia.</p>
+          <p class="px-4 pt-3 text-sm text-on-surface-variant">Estudiantes por debajo de {{ threshold() }}% de asistencia.</p>
           <ng-container *ngTemplateOutlet="studentTable; context: { rows: lowRows() }" />
         }
         @case ('session') {
@@ -133,13 +144,13 @@ const TABS: { id: Tab; label: string }[] = [
               @for (r of sessionRows(); track r.session.id) {
                 <tr>
                   <td>{{ r.course }}</td>
-                  <td class="font-medium text-gray-900">{{ r.session.title }}</td>
+                  <td class="font-medium text-on-surface">{{ r.session.title }}</td>
                   <td class="whitespace-nowrap">{{ r.session.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</td>
                   <td>{{ r.enrolled }}</td><td>{{ r.present }}</td><td>{{ r.late }}</td>
                   <td>{{ r.absent }}{{ r.pending ? ' (+' + r.pending + ' pend.)' : '' }}</td>
                   <td>{{ r.justified }}</td><td>{{ percent(r.percentage) }}</td>
                 </tr>
-              } @empty { <tr><td colspan="9" class="text-center text-gray-500">Sin sesiones.</td></tr> }
+              } @empty { <tr><td colspan="9" class="text-center text-on-surface-variant">Sin sesiones.</td></tr> }
             </tbody>
           </table>
         }
@@ -155,11 +166,11 @@ const TABS: { id: Tab; label: string }[] = [
                   <td class="whitespace-nowrap">{{ r.registeredAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</td>
                   <td>{{ r.course }}</td>
                   <td>{{ r.session }}</td>
-                  <td class="font-medium text-gray-900">{{ r.student }}</td>
+                  <td class="font-medium text-on-surface">{{ r.student }}</td>
                   <td><span [class]="statusBadge[r.status]">{{ statusLabels[r.status] }}</span></td>
                   <td>{{ sourceLabels[r.source] || r.source }}</td>
                 </tr>
-              } @empty { <tr><td colspan="6" class="text-center text-gray-500">Sin registros.</td></tr> }
+              } @empty { <tr><td colspan="6" class="text-center text-on-surface-variant">Sin registros.</td></tr> }
             </tbody>
           </table>
         }
@@ -177,13 +188,13 @@ const TABS: { id: Tab; label: string }[] = [
           @for (r of rows; track r.key) {
             <tr>
               <td>{{ r.code || '—' }}</td>
-              <td class="font-medium text-gray-900">{{ r.name }}</td>
+              <td class="font-medium text-on-surface">{{ r.name }}</td>
               <td>{{ r.course }}</td>
               <td>{{ r.validSessions }}</td><td>{{ r.present }}</td><td>{{ r.late }}</td>
               <td>{{ r.absent }}</td><td>{{ r.justified }}</td>
-              <td [class.text-red-700]="r.low" [class.font-medium]="r.low">{{ percent(r.percentage) }}</td>
+              <td [class.text-status-danger]="r.low" [class.font-medium]="r.low">{{ percent(r.percentage) }}</td>
             </tr>
-          } @empty { <tr><td colspan="9" class="text-center text-gray-500">Sin datos.</td></tr> }
+          } @empty { <tr><td colspan="9" class="text-center text-on-surface-variant">Sin datos.</td></tr> }
         </tbody>
       </table>
     </ng-template>
@@ -232,8 +243,17 @@ export class Reports {
     to: this.to() ? new Date(`${this.to()}T23:59:59.999`) : null,
   }));
 
+  protected readonly periodFilter = new PeriodFilter();
+  /** Cursos del periodo elegido (más el curso pedido por URL, aunque sea de otro periodo). */
+  protected readonly periodCourses = computed(() =>
+    this.courses().filter((c) => this.periodFilter.matches(c) || c.id === this.courseId()),
+  );
+
+  /** Un curso elegido manda sobre el filtro de periodo. */
   private readonly selectedCourses = computed(() =>
-    this.courses().filter((c) => !this.courseId() || c.id === this.courseId()),
+    this.courseId()
+      ? this.courses().filter((c) => c.id === this.courseId())
+      : this.courses().filter((c) => this.periodFilter.matches(c)),
   );
 
   private readonly studentById = computed(() => new Map(this.students().map((s) => [s.uid, s])));

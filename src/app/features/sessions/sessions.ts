@@ -16,7 +16,9 @@ import { AcademicScopeService } from '../../core/services/academic-scope.service
 import { errorMessage } from '../../core/services/error-message';
 import { SessionService } from '../../core/services/session.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { DialogService } from '../../shared/dialogs/dialog.service';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
+import { ToastService } from '../../shared/toast/toast.service';
 
 /** Fecha local en formato de <input type="datetime-local">. */
 function toLocalInput(date: Date): string {
@@ -42,7 +44,7 @@ function toLocalInput(date: Date): string {
     <div class="mt-6 grid gap-4 lg:grid-cols-3">
       <!-- Crear sesión -->
       <section class="card" aria-labelledby="create-title">
-        <h2 id="create-title" class="font-medium text-gray-900">Crear sesión</h2>
+        <h2 id="create-title" class="font-medium text-on-surface">Crear sesión</h2>
         <form [formGroup]="form" (ngSubmit)="create()" novalidate class="mt-3 space-y-3">
           <div>
             <label for="courseId" class="label">Curso asignado *</label>
@@ -75,7 +77,7 @@ function toLocalInput(date: Date): string {
                 aria-describedby="late-help" [attr.aria-invalid]="invalid('lateAfterMinutes')" />
             </div>
           </div>
-          <p id="late-help" class="text-xs text-gray-500">Vacío = sin control de tardanza.</p>
+          <p id="late-help" class="text-xs text-on-surface-variant">Vacío = sin control de tardanza.</p>
           <button type="submit" class="btn btn-primary w-full" [disabled]="busy()">Crear sesión</button>
         </form>
       </section>
@@ -120,7 +122,7 @@ function toLocalInput(date: Date): string {
               @for (s of filtered(); track s.id) {
                 <tr>
                   <td>{{ courseName(s.courseId) }}</td>
-                  <td class="font-medium text-gray-900">{{ s.title }}</td>
+                  <td class="font-medium text-on-surface">{{ s.title }}</td>
                   <td class="whitespace-nowrap">{{ s.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</td>
                   <td class="whitespace-nowrap">{{ s.expiresAt | tsDate | date: 'HH:mm' }}</td>
                   <td>
@@ -141,7 +143,7 @@ function toLocalInput(date: Date): string {
                   </td>
                 </tr>
               } @empty {
-                <tr><td colspan="6" class="text-center text-gray-500">Sin sesiones.</td></tr>
+                <tr><td colspan="6" class="text-center text-on-surface-variant">Sin sesiones.</td></tr>
               }
             </tbody>
           </table>
@@ -155,6 +157,8 @@ export class Sessions {
 
   protected readonly scope = inject(AcademicScopeService);
   private readonly sessionService = inject(SessionService);
+  private readonly dialogs = inject(DialogService);
+  private readonly toast = inject(ToastService);
   private readonly settings = inject(SettingsService).settings;
   private readonly router = inject(Router);
   private readonly fb = inject(NonNullableFormBuilder);
@@ -245,24 +249,33 @@ export class Sessions {
         lateAfterMinutes: value.lateAfterMinutes ?? null,
       });
       this.form.controls.title.reset('');
+      this.toast.success(`${value.title.trim()} · ${this.courseName(value.courseId)}. Ya puedes mostrar el QR.`, {
+        title: 'Sesión creada',
+      });
       await this.router.navigate(['/live-attendance'], { queryParams: { sessionId: id } });
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e), { title: 'No se pudo crear la sesión' });
     } finally {
       this.busy.set(false);
     }
   }
 
   async close(session: ClassSession): Promise<void> {
-    if (!window.confirm(`¿Cerrar la sesión "${session.title}"? Ya no se podrá registrar asistencia por QR.`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Cerrar sesión de clase',
+      message: `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
+      confirmText: 'Cerrar sesión',
+      tone: 'danger',
+    });
+    if (!ok) return;
     this.busy.set(true);
     this.error.set(null);
     try {
       await this.sessionService.close(session);
-      this.message.set('Sesión cerrada.');
+      this.toast.success(`"${session.title}" se cerró. Ya no se registra asistencia por QR.`, { title: 'Sesión cerrada' });
       this.now.set(Date.now());
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }

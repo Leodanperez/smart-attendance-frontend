@@ -34,6 +34,7 @@ import {
   UserProfile,
   UserRole,
   UserStatus,
+  buildInstitutionalCode,
   normalizeProfile,
   sortByName,
 } from '../models/user.model';
@@ -105,7 +106,7 @@ export class UserService {
   async createUser(input: CreateUserInput): Promise<string> {
     const email = input.email.trim().toLowerCase();
     const documentNumber = input.documentNumber.trim().toUpperCase();
-    const institutionalCode = input.institutionalCode.trim().toUpperCase() || null;
+    const institutionalCode = buildInstitutionalCode(input.role, documentNumber);
 
     await this.ensureUnique('documentNumber', documentNumber, 'app/document-in-use');
     if (institutionalCode) {
@@ -174,7 +175,8 @@ export class UserService {
     reason: string | null,
   ): Promise<void> {
     const documentNumber = input.documentNumber.trim().toUpperCase();
-    const institutionalCode = input.institutionalCode?.trim().toUpperCase() || null;
+    // El código se regenera con el documento: PREFIJO-DOCUMENTO.
+    const institutionalCode = buildInstitutionalCode(user.role, documentNumber) ?? user.institutionalCode;
 
     if (documentNumber && documentNumber !== user.documentNumber) {
       await this.ensureUnique('documentNumber', documentNumber, 'app/document-in-use', user.uid);
@@ -236,8 +238,11 @@ export class UserService {
   async setRole(user: UserProfile, role: UserRole, reason: string): Promise<void> {
     this.preventSelfChange(user.uid);
     const batch = this.run(() => writeBatch(this.firestore));
+    // Al cambiar de rol cambia el prefijo del código (STU- → TEA-, etc.).
+    const institutionalCode = buildInstitutionalCode(role, user.documentNumber) ?? user.institutionalCode;
     batch.update(this.run(() => doc(this.firestore, 'users', user.uid)), {
       role,
+      institutionalCode,
       updatedAt: serverTimestamp(),
     });
     this.audit.addToBatch(batch, {
@@ -245,7 +250,7 @@ export class UserService {
       entityType: 'USER',
       entityId: user.uid,
       reason,
-      details: { from: user.role, to: role },
+      details: { from: user.role, to: role, institutionalCode },
     });
     await batch.commit();
   }

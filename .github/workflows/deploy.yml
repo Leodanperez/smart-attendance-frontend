@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+# Publica el panel Angular en GitHub Pages en cada push a main.
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # base-href = "/<nombre-del-repo>/" para que las rutas y los assets carguen bien en Pages.
+      - name: Build
+        run: npx ng build --configuration production --base-href "/${{ github.event.repository.name }}/"
+
+      # SPA fallback: copiar index.html como 404.html (respaldo aunque usemos hash routing).
+      - name: SPA 404 fallback
+        run: cp dist/smart-attendance-frontend/browser/index.html dist/smart-attendance-frontend/browser/404.html
+
+      # Evita que Pages ignore carpetas que empiezan con "_".
+      - name: Add .nojekyll
+        run: touch dist/smart-attendance-frontend/browser/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/smart-attendance-frontend/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

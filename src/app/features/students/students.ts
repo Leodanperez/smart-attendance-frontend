@@ -57,7 +57,7 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
           @for (r of rows(); track r.key) {
             <tr>
               <td>{{ r.code || '—' }}</td>
-              <td class="font-medium text-gray-900">{{ r.name }}</td>
+              <td class="font-medium text-on-surface">{{ r.name }}</td>
               <td>{{ r.email }}</td>
               <td>{{ r.course }}</td>
               <td>{{ r.validSessions }}</td>
@@ -66,12 +66,12 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="6" class="text-center text-gray-500">Sin estudiantes.</td></tr>
+            <tr><td colspan="6" class="text-center text-on-surface-variant">Sin estudiantes.</td></tr>
           }
         </tbody>
       </table>
     </div>
-    <p class="mt-2 text-xs text-gray-500">{{ rule }}</p>
+    <p class="mt-2 text-xs text-on-surface-variant">{{ rule }}</p>
   `,
 })
 export class Students {

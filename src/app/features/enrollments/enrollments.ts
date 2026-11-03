@@ -17,7 +17,8 @@ import { errorMessage } from '../../core/services/error-message';
 import { tsMillis, tsToDate } from '../../core/services/firestore.utils';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 import { downloadCsv, fileDate } from '../../shared/utils/csv';
-import { askReason } from '../../shared/utils/prompt';
+import { DialogService } from '../../shared/dialogs/dialog.service';
+import { ToastService } from '../../shared/toast/toast.service';
 
 /** W07 — Inscripciones y códigos. */
 @Component({
@@ -47,10 +48,10 @@ import { askReason } from '../../shared/utils/prompt';
     @if (courseId()) {
       <!-- Código generado: se muestra una sola vez -->
       @if (generatedCode()) {
-        <div class="card mt-4 border-2 border-blue-200" role="status">
-          <p class="text-sm text-gray-700">Código generado. Cópialo ahora: por seguridad no se volverá a mostrar.</p>
+        <div class="card mt-4 border-2 border-primary/30" role="status">
+          <p class="text-sm text-on-surface">Código generado. Cópialo ahora: por seguridad no se volverá a mostrar.</p>
           <div class="mt-2 flex flex-wrap items-center gap-3">
-            <span class="rounded-md bg-gray-100 px-4 py-2 font-mono text-2xl tracking-widest">{{ generatedCode() }}</span>
+            <span class="rounded-md bg-surface-container-high px-4 py-2 font-mono text-2xl tracking-widest">{{ generatedCode() }}</span>
             <button type="button" class="btn btn-secondary btn-sm" (click)="copy()">Copiar</button>
             <button type="button" class="btn btn-secondary btn-sm" (click)="generatedCode.set(null)">Ocultar</button>
           </div>
@@ -60,7 +61,7 @@ import { askReason } from '../../shared/utils/prompt';
       <div class="mt-4 grid gap-4 lg:grid-cols-3">
         <!-- Generar código -->
         <section class="card" aria-labelledby="gen-title">
-          <h2 id="gen-title" class="font-medium text-gray-900">Generar código de inscripción</h2>
+          <h2 id="gen-title" class="font-medium text-on-surface">Generar código de inscripción</h2>
           <form [formGroup]="codeForm" (ngSubmit)="generate()" novalidate class="mt-3 space-y-3">
             <div>
               <label for="validDays" class="label">Vigencia (días)</label>
@@ -75,8 +76,8 @@ import { askReason } from '../../shared/utils/prompt';
             <button type="submit" class="btn btn-primary w-full" [disabled]="busy() || codeForm.invalid">Generar código</button>
           </form>
 
-          <h3 class="mt-6 text-sm font-medium text-gray-700">Códigos del curso</h3>
-          <ul class="mt-2 divide-y divide-gray-100 text-sm">
+          <h3 class="mt-6 text-sm font-medium text-on-surface">Códigos del curso</h3>
+          <ul class="mt-2 divide-y divide-outline-variant/50 text-sm">
             @for (code of codes(); track code.id) {
               <li class="py-2">
                 <div class="flex items-center justify-between gap-2">
@@ -85,12 +86,12 @@ import { askReason } from '../../shared/utils/prompt';
                     <button type="button" class="btn btn-secondary btn-sm" [disabled]="busy()" (click)="disable(code)">Desactivar</button>
                   }
                 </div>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-on-surface-variant">
                   Usos {{ code.uses }}/{{ code.maxUses }} · vence {{ code.expiresAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}
                 </p>
               </li>
             } @empty {
-              <li class="py-2 text-gray-500">Sin códigos.</li>
+              <li class="py-2 text-on-surface-variant">Sin códigos.</li>
             }
           </ul>
         </section>
@@ -98,7 +99,7 @@ import { askReason } from '../../shared/utils/prompt';
         <!-- Estudiantes inscritos -->
         <section class="card lg:col-span-2" aria-labelledby="enrolled-title">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="enrolled-title" class="font-medium text-gray-900">
+            <h2 id="enrolled-title" class="font-medium text-on-surface">
               Estudiantes inscritos ({{ activeCount() }})
             </h2>
             <button type="button" class="btn btn-secondary btn-sm" (click)="exportCsv()">Exportar lista</button>
@@ -133,7 +134,7 @@ import { askReason } from '../../shared/utils/prompt';
                 @for (row of rows(); track row.enrollment.id) {
                   <tr>
                     <td>{{ row.code || '—' }}</td>
-                    <td class="font-medium text-gray-900">{{ row.name }}</td>
+                    <td class="font-medium text-on-surface">{{ row.name }}</td>
                     <td>{{ row.email }}</td>
                     <td class="whitespace-nowrap">{{ row.enrollment.enrolledAt | tsDate | date: 'dd/MM/yyyy' }}</td>
                     <td>{{ enrollmentLabels[row.enrollment.status] }}</td>
@@ -144,7 +145,7 @@ import { askReason } from '../../shared/utils/prompt';
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="6" class="text-center text-gray-500">Sin estudiantes inscritos.</td></tr>
+                  <tr><td colspan="6" class="text-center text-on-surface-variant">Sin estudiantes inscritos.</td></tr>
                 }
               </tbody>
             </table>
@@ -159,6 +160,7 @@ export class Enrollments {
 
   private readonly scope = inject(AcademicScopeService);
   private readonly enrollmentService = inject(EnrollmentService);
+  private readonly dialogs = inject(DialogService);
 
   protected readonly label = courseLabel;
   protected readonly name = fullName;
@@ -169,6 +171,7 @@ export class Enrollments {
 
   protected readonly courseId = signal('');
   protected readonly busy = signal(false);
+  private readonly toast = inject(ToastService);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
   protected readonly generatedCode = signal<string | null>(null);
@@ -252,12 +255,19 @@ export class Enrollments {
     await this.run(async () => {
       const code = await this.enrollmentService.generateCode(this.courseId(), validDays, maxUses);
       this.generatedCode.set(code);
+      this.toast.warning('Cópialo ahora: por seguridad no se volverá a mostrar.', { title: 'Código generado' });
       return null;
     });
   }
 
   async disable(code: EnrollmentCode): Promise<void> {
-    if (!window.confirm('¿Desactivar este código? Ya no podrá usarse.')) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Desactivar código',
+      message: 'El código dejará de funcionar y los estudiantes ya no podrán usarlo para inscribirse.',
+      confirmText: 'Desactivar',
+      tone: 'danger',
+    });
+    if (!ok) return;
     await this.run(async () => {
       await this.enrollmentService.disableCode(code);
       return 'Código desactivado.';
@@ -273,7 +283,12 @@ export class Enrollments {
   }
 
   async drop(enrollment: Enrollment, studentName: string): Promise<void> {
-    const reason = askReason(`Motivo para retirar a ${studentName} del curso:`);
+    const reason = await this.dialogs.reason({
+      title: 'Retirar inscripción',
+      message: `${studentName} dejará de figurar como inscrito en el curso.`,
+      confirmText: 'Retirar',
+      tone: 'danger',
+    });
     if (!reason) return;
     await this.run(async () => {
       await this.enrollmentService.drop(enrollment, reason);
@@ -286,9 +301,9 @@ export class Enrollments {
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
-      this.message.set('Código copiado al portapapeles.');
+      this.toast.info('Compártelo con los estudiantes del curso.', { title: 'Código copiado' });
     } catch {
-      this.error.set('No se pudo copiar. Selecciónalo y cópialo manualmente.');
+      this.toast.warning('Selecciónalo y cópialo manualmente.', { title: 'No se pudo copiar' });
     }
   }
 
@@ -312,9 +327,10 @@ export class Enrollments {
     this.error.set(null);
     this.message.set(null);
     try {
-      this.message.set(await action());
+      const msg = await action();
+      if (msg) this.toast.success(msg);
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }

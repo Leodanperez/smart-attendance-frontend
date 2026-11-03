@@ -17,7 +17,13 @@ import {
 import { Observable, catchError, combineLatest, map, of } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
-import { Course, CourseInput, CourseStatus, normalizeCourse } from '../models/course.model';
+import {
+  Course,
+  CourseInput,
+  CourseStatus,
+  generateCourseCode,
+  normalizeCourse,
+} from '../models/course.model';
 import { AuditService } from './audit.service';
 
 const byName = (a: Course, b: Course) =>
@@ -67,9 +73,9 @@ export class CourseService {
     );
   }
 
-  async create(input: CourseInput): Promise<string> {
-    const courseCode = input.courseCode.trim().toUpperCase();
-    await this.ensureCodeFree(courseCode);
+  /** Crea el curso con código generado INICIALES-AÑO-NNNN (único). Devuelve id y código. */
+  async create(input: CourseInput): Promise<{ id: string; courseCode: string }> {
+    const courseCode = await this.generateUniqueCode(input.name);
 
     const ref = this.run(() => doc(this.coursesRef));
     const batch = this.run(() => writeBatch(this.firestore));
@@ -84,15 +90,15 @@ export class CourseService {
       action: 'COURSE_CREATED',
       entityType: 'COURSE',
       entityId: ref.id,
-      details: { courseCode, teacherIds: input.teacherIds },
+      details: { courseCode, careerId: input.careerId, semester: input.semester, teacherIds: input.teacherIds },
     });
     await batch.commit();
-    return ref.id;
+    return { id: ref.id, courseCode };
   }
 
+  /** El código del curso no cambia al editar (lo usan inscripciones y reportes). */
   async update(course: Course, input: CourseInput): Promise<void> {
-    const courseCode = input.courseCode.trim().toUpperCase();
-    if (courseCode !== course.courseCode) await this.ensureCodeFree(courseCode, course.id);
+    const courseCode = course.courseCode;
 
     const batch = this.run(() => writeBatch(this.firestore));
     batch.update(this.run(() => doc(this.firestore, 'courses', course.id)), {
@@ -104,7 +110,13 @@ export class CourseService {
       action: 'COURSE_UPDATED',
       entityType: 'COURSE',
       entityId: course.id,
-      details: { courseCode, teacherIds: input.teacherIds, status: input.status },
+      details: {
+        courseCode,
+        careerId: input.careerId,
+        semester: input.semester,
+        teacherIds: input.teacherIds,
+        status: input.status,
+      },
     });
     await batch.commit();
   }
@@ -158,16 +170,26 @@ export class CourseService {
     return {
       name: input.name.trim(),
       description: input.description.trim(),
+      careerId: input.careerId,
+      careerName: input.careerName?.trim() || null,
+      semester: input.semester,
+      academicPeriodId: input.academicPeriodId,
+      academicPeriodName: input.academicPeriodName,
       section: input.section.trim().toUpperCase(),
       teacherIds: [...new Set(input.teacherIds)],
       status: input.status,
     };
   }
 
-  private async ensureCodeFree(courseCode: string, exceptId?: string): Promise<void> {
-    const snapshot = await this.run(() =>
-      getDocs(query(this.coursesRef, where('courseCode', '==', courseCode), limit(2))),
-    );
-    if (snapshot.docs.some((d) => d.id !== exceptId)) throw { code: 'app/course-code-in-use' };
+  /** Genera INICIALES-AÑO-NNNN y reintenta si ya existe (9000 combinaciones por iniciales/año). */
+  private async generateUniqueCode(name: string): Promise<string> {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const code = generateCourseCode(name);
+      const snapshot = await this.run(() =>
+        getDocs(query(this.coursesRef, where('courseCode', '==', code), limit(1))),
+      );
+      if (snapshot.empty) return code;
+    }
+    throw { code: 'app/course-code-in-use' };
   }
 }

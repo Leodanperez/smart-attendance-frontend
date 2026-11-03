@@ -12,23 +12,23 @@ export interface BarDatum {
   selector: 'app-bar-chart',
   template: `
     <figure class="card h-full">
-      <figcaption class="font-medium text-gray-900">{{ title() }}</figcaption>
+      <figcaption class="font-medium text-on-surface">{{ title() }}</figcaption>
       @if (data().length) {
         <ul class="mt-4 space-y-3">
           @for (item of data(); track item.label) {
             <li>
-              <div class="flex justify-between gap-2 text-xs text-gray-600">
+              <div class="flex justify-between gap-2 text-xs text-on-surface-variant">
                 <span class="truncate">{{ item.label }}</span>
-                <span class="font-medium text-gray-900">{{ item.display ?? item.value }}</span>
+                <span class="font-medium text-on-surface">{{ item.display ?? item.value }}</span>
               </div>
-              <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true">
-                <div class="h-2 rounded-full bg-blue-600" [style.width.%]="width(item.value)"></div>
+              <div class="mt-1 h-2 rounded-full bg-surface-container-high" aria-hidden="true">
+                <div class="h-2 rounded-full bg-primary" [style.width.%]="width(item.value)"></div>
               </div>
             </li>
           }
         </ul>
       } @else {
-        <p class="mt-4 text-sm text-gray-500">Sin datos para los filtros seleccionados.</p>
+        <p class="mt-4 text-sm text-on-surface-variant">Sin datos para los filtros seleccionados.</p>
       }
     </figure>
   `,

@@ -6,12 +6,11 @@ import {
   LOCALE_ID,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withHashLocation } from '@angular/router';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
 import { ReCaptchaEnterpriseProvider, initializeAppCheck, provideAppCheck } from '@angular/fire/app-check';
 import { getAuth, provideAuth } from '@angular/fire/auth';
 import { getFirestore, provideFirestore } from '@angular/fire/firestore';
-import { getFunctions, provideFunctions } from '@angular/fire/functions';
 import { getStorage, provideStorage } from '@angular/fire/storage';
 
 import { routes } from './app.routes';
@@ -34,13 +33,13 @@ const appCheckProviders: EnvironmentProviders[] = environment.recaptchaEnterpris
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes, withComponentInputBinding()),
+    // Hash routing (#/dashboard): funciona en GitHub Pages sin 404 al recargar.
+    provideRouter(routes, withComponentInputBinding(), withHashLocation()),
     { provide: LOCALE_ID, useValue: 'es-PE' },
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     ...appCheckProviders,
     provideAuth(() => getAuth()),
     provideFirestore(() => getFirestore()),
-    provideFunctions(() => getFunctions()),
     provideStorage(() => getStorage()),
   ],
 };

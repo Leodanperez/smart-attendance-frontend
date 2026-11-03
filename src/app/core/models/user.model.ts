@@ -73,7 +73,6 @@ export interface CreateUserInput {
   lastName: string;
   email: string;
   password: string;
-  institutionalCode: string;
   documentType: DocumentType;
   documentNumber: string;
   birthDate: string;
@@ -88,7 +87,6 @@ export interface CreateUserInput {
 export interface InstitutionalDataInput {
   firstName: string;
   lastName: string;
-  institutionalCode: string | null;
   documentType: DocumentType;
   documentNumber: string;
   birthDate: string;
@@ -118,6 +116,22 @@ export interface AppUser {
 }
 
 export const HOME_ROUTE = '/dashboard';
+
+/** Prefijo del código institucional por rol. */
+export const ROLE_CODE_PREFIX: Record<UserRole, string> = {
+  STUDENT: 'STU',
+  TEACHER: 'TEA',
+  ADMIN: 'ADM',
+};
+
+/**
+ * Código institucional generado: PREFIJO-DOCUMENTO (p. ej. STU-12345678).
+ * Es único porque el número de documento es único. null si aún no hay documento.
+ */
+export function buildInstitutionalCode(role: UserRole, documentNumber: string | null | undefined): string | null {
+  const doc = (documentNumber ?? '').trim().toUpperCase();
+  return doc ? `${ROLE_CODE_PREFIX[role]}-${doc}` : null;
+}
 
 export function isUserRole(value: unknown): value is UserRole {
   return typeof value === 'string' && (USER_ROLES as readonly string[]).includes(value);

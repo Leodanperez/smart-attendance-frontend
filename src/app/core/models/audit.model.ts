@@ -7,6 +7,8 @@ export type AuditEntityType =
   | 'ENROLLMENT_CODE'
   | 'SESSION'
   | 'ATTENDANCE'
+  | 'CAREER'
+  | 'PERIOD'
   | 'SETTINGS';
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
@@ -16,6 +18,8 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
   ENROLLMENT_CODE: 'Código de inscripción',
   SESSION: 'Sesión',
   ATTENDANCE: 'Asistencia',
+  CAREER: 'Carrera',
+  PERIOD: 'Periodo académico',
   SETTINGS: 'Configuración',
 };
 
@@ -24,6 +28,13 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   USER_UPDATED: 'Datos de usuario actualizados',
   USER_STATUS_CHANGED: 'Estado de usuario cambiado',
   USER_ROLE_CHANGED: 'Rol de usuario cambiado',
+  PERIOD_CREATED: 'Periodo académico creado',
+  PERIOD_UPDATED: 'Periodo académico actualizado',
+  PERIOD_ACTIVATED: 'Periodo académico iniciado',
+  PERIOD_CLOSED: 'Periodo académico cerrado',
+  CAREER_CREATED: 'Carrera creada',
+  CAREER_UPDATED: 'Carrera actualizada',
+  CAREER_STATUS_CHANGED: 'Estado de carrera cambiado',
   COURSE_CREATED: 'Curso creado',
   COURSE_UPDATED: 'Curso actualizado',
   COURSE_STATUS_CHANGED: 'Estado de curso cambiado',

@@ -3,6 +3,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 
 import { errorMessage } from '../../core/services/error-message';
 import { SettingsService } from '../../core/services/settings.service';
+import { ToastService } from '../../shared/toast/toast.service';
 
 /** Configuración institucional (ADMIN). */
 @Component({
@@ -38,7 +39,7 @@ import { SettingsService } from '../../core/services/settings.service';
           <label for="qrRefreshSeconds" class="label">Renovación del QR (s)</label>
           <input id="qrRefreshSeconds" type="number" min="15" max="600" formControlName="qrRefreshSeconds" class="input"
             aria-describedby="qr-help" [attr.aria-invalid]="form.controls.qrRefreshSeconds.invalid" />
-          <p id="qr-help" class="mt-1 text-xs text-gray-500">Se usa si la Cloud Function no informa la expiración.</p>
+          <p id="qr-help" class="mt-1 text-xs text-on-surface-variant">Se usa si la Cloud Function no informa la expiración.</p>
         </div>
 
         @if (error()) {
@@ -59,6 +60,7 @@ import { SettingsService } from '../../core/services/settings.service';
 })
 export class Settings {
   private readonly settingsService = inject(SettingsService);
+  private readonly toast = inject(ToastService);
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -92,9 +94,9 @@ export class Settings {
       const value = this.form.getRawValue();
       await this.settingsService.save({ ...value, institutionName: value.institutionName.trim() });
       this.form.markAsPristine();
-      this.message.set('Configuración guardada.');
+      this.toast.success('Los cambios ya se aplican en todo el panel.', { title: 'Configuración guardada' });
     } catch (e) {
-      this.error.set(errorMessage(e));
+      this.toast.error(errorMessage(e));
     } finally {
       this.saving.set(false);
     }

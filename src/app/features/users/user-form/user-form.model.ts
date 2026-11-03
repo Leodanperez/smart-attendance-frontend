@@ -10,6 +10,7 @@ import {
  * Modelo del formulario de registro (fuente de verdad del Signal Form).
  * Agrupado por secciones; se transforma a `users/{uid}` (firebase-data-model.json) al enviar.
  * Los selects sin elegir usan '' para que `required` los detecte.
+ * El código institucional no está aquí: se genera como PREFIJO-DOCUMENTO (STU-/TEA-/ADM-).
  */
 export interface UserFormModel {
   personal: {
@@ -28,7 +29,6 @@ export interface UserFormModel {
   account: {
     role: UserRole | '';
     status: UserStatus;
-    institutionalCode: string;
     password: string;
     confirmPassword: string;
   };
@@ -48,19 +48,11 @@ export function initialUserForm(): UserFormModel {
     account: {
       role: '',
       status: 'ACTIVE',
-      institutionalCode: '',
       password: '',
       confirmPassword: '',
     },
   };
 }
-
-/** Prefijo sugerido del código institucional por rol (EST-0001, DOC-0001, ADM-0001). */
-export const CODE_PREFIX: Record<UserRole, string> = {
-  STUDENT: 'EST-',
-  TEACHER: 'DOC-',
-  ADMIN: 'ADM-',
-};
 
 /** Normaliza y convierte el valor del formulario al input del servicio (ya validado). */
 export function toCreateUserInput(value: UserFormModel): CreateUserInput {
@@ -77,7 +69,6 @@ export function toCreateUserInput(value: UserFormModel): CreateUserInput {
     address: contact.address.trim(),
     role: account.role as UserRole,
     status: account.status,
-    institutionalCode: account.institutionalCode.trim().toUpperCase(),
     password: account.password,
   };
 }
