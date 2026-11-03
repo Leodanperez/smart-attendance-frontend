@@ -36,8 +36,16 @@ function deepestTitle(route: ActivatedRoute): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="sticky top-0 z-20 flex h-16 items-center gap-3 bg-surface-container/90 px-4 shadow-card backdrop-blur md:px-6">
+      <!-- Hamburguesa móvil: abre el drawer -->
       <button type="button" class="btn-icon lg:hidden" aria-label="Abrir menú" aria-controls="mobile-sidebar"
         [attr.aria-expanded]="layout.mobileOpen()" (click)="layout.mobileOpen.set(true)">
+        <app-icon [name]="icons.menu" [size]="20" />
+      </button>
+
+      <!-- Hamburguesa escritorio: colapsa/expande el sidebar -->
+      <button type="button" class="btn-icon hidden lg:inline-flex"
+        [attr.aria-label]="layout.collapsed() ? 'Expandir menú' : 'Contraer menú'"
+        [attr.aria-expanded]="!layout.collapsed()" (click)="layout.toggleCollapsed()">
         <app-icon [name]="icons.menu" [size]="20" />
       </button>
 

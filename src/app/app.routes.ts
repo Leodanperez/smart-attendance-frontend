@@ -89,6 +89,20 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/courses/course-detail').then((m) => m.CourseDetail),
             },
 
+            // Vistas de consulta del estudiante
+            {
+                path: 'my-attendance',
+                title: t('Mi asistencia'),
+                canActivate: [roleGuard('STUDENT')],
+                loadComponent: () => import('./features/student/my-attendance').then((m) => m.MyAttendance),
+            },
+            {
+                path: 'my-schedule',
+                title: t('Mi horario'),
+                canActivate: [roleGuard('STUDENT')],
+                loadComponent: () => import('./features/student/my-schedule').then((m) => m.MySchedule),
+            },
+
             // Administración académica (W06, W07)
             {
                 path: 'teacher-assignments',

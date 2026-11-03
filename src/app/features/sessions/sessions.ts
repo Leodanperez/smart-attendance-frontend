@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -78,6 +78,12 @@ function toLocalInput(date: Date): string {
             </div>
           </div>
           <p id="late-help" class="text-xs text-on-surface-variant">Vacío = sin control de tardanza.</p>
+          @if (endPreview(); as end) {
+            <p class="rounded-md bg-surface-container-low px-3 py-2 text-sm text-on-surface">
+              Fin de la sesión: <strong>{{ end | date: 'dd/MM/yyyy HH:mm' }}</strong>
+              <span class="block text-xs text-on-surface-variant">Al llegar esta hora ciérrala para marcar faltas a quienes no registraron.</span>
+            </p>
+          }
           <button type="submit" class="btn btn-primary w-full" [disabled]="busy()">Crear sesión</button>
         </form>
       </section>
@@ -106,7 +112,8 @@ function toLocalInput(date: Date): string {
           </div>
         </div>
 
-        <div class="table-wrap mt-4">
+        <!-- Tabla (escritorio) -->
+        <div class="table-wrap mt-4 hidden md:block">
           <table class="table">
             <thead>
               <tr>
@@ -148,6 +155,39 @@ function toLocalInput(date: Date): string {
             </tbody>
           </table>
         </div>
+
+        <!-- Tarjetas (móvil) -->
+        <ul class="mt-4 space-y-3 md:hidden">
+          @for (s of filtered(); track s.id) {
+            <li class="card p-4">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="truncate font-medium text-on-surface">{{ s.title }}</p>
+                  <p class="truncate text-xs text-on-surface-variant">{{ courseName(s.courseId) }}</p>
+                </div>
+                <div class="flex shrink-0 flex-col items-end gap-1">
+                  <span [class]="statusBadge[s.status]">{{ statusLabels[s.status] }}</span>
+                  @if (isExpired(s)) {
+                    <span class="badge badge-yellow">Hora vencida</span>
+                  }
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-on-surface-variant">
+                {{ s.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }} – {{ s.expiresAt | tsDate | date: 'HH:mm' }}
+              </p>
+              <div class="mt-3 flex flex-wrap justify-end gap-2 border-t border-outline-variant/50 pt-3">
+                <a routerLink="/live-attendance" [queryParams]="{ sessionId: s.id }" class="btn btn-secondary btn-sm">
+                  {{ s.status === 'ACTIVE' ? 'QR / En vivo' : 'Ver asistencia' }}
+                </a>
+                @if (s.status === 'ACTIVE') {
+                  <button type="button" class="btn btn-danger btn-sm" [disabled]="busy()" (click)="close(s)">Cerrar</button>
+                }
+              </div>
+            </li>
+          } @empty {
+            <li class="card text-center text-sm text-on-surface-variant">Sin sesiones.</li>
+          }
+        </ul>
       </section>
     </div>
   `,
@@ -170,6 +210,8 @@ export class Sessions {
 
   protected readonly courses = toSignal(this.scope.courses$, { initialValue: [] });
   private readonly sessions = toSignal(this.scope.sessions$, { initialValue: [] as ClassSession[] });
+  private readonly enrollments = toSignal(this.scope.enrollments$, { initialValue: [] });
+  private readonly attendances = toSignal(this.scope.attendances$, { initialValue: [] });
 
   protected readonly activeCourses = computed(() => this.courses().filter((c) => c.status === 'ACTIVE'));
   protected readonly filterCourse = signal('');
@@ -187,6 +229,24 @@ export class Sessions {
     lateAfterMinutes: this.fb.control<number | null>(15, [Validators.min(0), Validators.max(600)]),
   });
 
+  private readonly startsAtValue = toSignal(this.form.controls.startsAt.valueChanges, {
+    initialValue: this.form.controls.startsAt.value,
+  });
+  private readonly durationValue = toSignal(this.form.controls.durationMinutes.valueChanges, {
+    initialValue: this.form.controls.durationMinutes.value,
+  });
+
+  /** Fecha/hora fin calculada (inicio + duración) para mostrarla en el formulario. */
+  protected readonly endPreview = computed<Date | null>(() => {
+    const start = new Date(this.startsAtValue());
+    const minutes = this.durationValue();
+    if (Number.isNaN(start.getTime()) || !minutes || minutes <= 0) return null;
+    return new Date(start.getTime() + minutes * 60_000);
+  });
+
+  /** Sesiones ya cerradas automáticamente en esta visita (evita reintentos en cada recálculo). */
+  private readonly autoClosed = new Set<string>();
+
   constructor() {
     effect(() => {
       const preset = this.courseIdParam();
@@ -198,6 +258,33 @@ export class Sessions {
       if (this.form.controls.durationMinutes.pristine) this.form.controls.durationMinutes.setValue(s.defaultSessionMinutes);
       if (this.form.controls.lateAfterMinutes.pristine) this.form.controls.lateAfterMinutes.setValue(s.defaultLateAfterMinutes);
     });
+    // Refresca "ahora" cada 30 s para detectar vencimientos mientras el docente mira la lista.
+    const timer = setInterval(() => this.now.set(Date.now()), 30_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    // Cierre diferido: al entrar, cierra y marca faltas en sesiones ACTIVE cuya hora fin ya pasó.
+    // Sin Cloud Functions esto ocurre cuando el docente abre el panel (no al segundo exacto del fin).
+    effect(() => {
+      const nowMs = this.now();
+      for (const s of this.sessions()) {
+        if (s.status === 'ACTIVE' && s.expiresAt.toMillis() < nowMs && !this.autoClosed.has(s.id)) {
+          this.autoClosed.add(s.id);
+          void this.autoClose(s);
+        }
+      }
+    });
+  }
+
+  /** Cierra automáticamente una sesión vencida y marca faltas (cierre diferido). */
+  private async autoClose(session: ClassSession): Promise<void> {
+    try {
+      await this.sessionService.closeAndMarkAbsent(session, this.absentStudentIds(session));
+      this.toast.info(`"${session.title}" venció y se cerró automáticamente. Se marcaron las faltas.`, {
+        title: 'Sesión cerrada',
+      });
+    } catch {
+      // Si falla (p. ej. permisos o ya cerrada por otro), se reintenta en la próxima visita.
+      this.autoClosed.delete(session.id);
+    }
   }
 
   protected readonly filtered = computed(() =>
@@ -260,19 +347,40 @@ export class Sessions {
     }
   }
 
+  /** Inscritos ACTIVE del curso sin registro de asistencia en la sesión → faltas al cerrar. */
+  private absentStudentIds(session: ClassSession): string[] {
+    const registered = new Set(
+      this.attendances()
+        .filter((a) => a.sessionId === session.id)
+        .map((a) => a.studentId),
+    );
+    return this.enrollments()
+      .filter((e) => e.courseId === session.courseId && e.status === 'ACTIVE' && !registered.has(e.studentId))
+      .map((e) => e.studentId);
+  }
+
   async close(session: ClassSession): Promise<void> {
+    const absentIds = this.absentStudentIds(session);
     const ok = await this.dialogs.confirm({
-      title: 'Cerrar sesión de clase',
-      message: `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
-      confirmText: 'Cerrar sesión',
+      title: 'Cerrar sesión y marcar faltas',
+      message:
+        absentIds.length > 0
+          ? `"${session.title}" se cerrará. ${absentIds.length} estudiante(s) sin registro quedarán marcados como falta. Podrás corregir con un motivo después.`
+          : `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
+      confirmText: 'Cerrar y marcar faltas',
       tone: 'danger',
     });
     if (!ok) return;
     this.busy.set(true);
     this.error.set(null);
     try {
-      await this.sessionService.close(session);
-      this.toast.success(`"${session.title}" se cerró. Ya no se registra asistencia por QR.`, { title: 'Sesión cerrada' });
+      await this.sessionService.closeAndMarkAbsent(session, absentIds);
+      this.toast.success(
+        absentIds.length > 0
+          ? `"${session.title}" se cerró. ${absentIds.length} falta(s) registrada(s).`
+          : `"${session.title}" se cerró. Ya no se registra asistencia por QR.`,
+        { title: 'Sesión cerrada' },
+      );
       this.now.set(Date.now());
     } catch (e) {
       this.toast.error(errorMessage(e));

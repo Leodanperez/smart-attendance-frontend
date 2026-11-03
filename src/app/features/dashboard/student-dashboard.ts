@@ -19,8 +19,16 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
   selector: 'app-student-dashboard',
   imports: [RouterLink, DatePipe, TsDatePipe],
   template: `
-    <h1 class="page-title">Hola, {{ user()?.displayName }}</h1>
-    <p class="page-subtitle">Consulta tus cursos e historial. El registro de asistencia se hace desde la app Android.</p>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 class="page-title">Hola, {{ user()?.displayName }}</h1>
+        <p class="page-subtitle">Consulta tus cursos e historial. El registro de asistencia se hace desde la app Android.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a routerLink="/my-schedule" class="btn btn-secondary">Mi horario</a>
+        <a routerLink="/my-attendance" class="btn btn-secondary">Mi asistencia</a>
+      </div>
+    </div>
 
     @if (scope.error()) {
       <p role="alert" class="alert-error mt-4">{{ scope.error() }}</p>

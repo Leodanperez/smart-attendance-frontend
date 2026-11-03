@@ -88,7 +88,8 @@ import { ToastService } from '../../shared/toast/toast.service';
       <p role="alert" class="alert-error mt-4">{{ error() || scope.error() }}</p>
     }
 
-    <div class="table-wrap mt-4">
+    <!-- Tabla (escritorio) -->
+    <div class="table-wrap mt-4 hidden lg:block">
       <table class="table">
         <thead>
           <tr>
@@ -143,6 +144,43 @@ import { ToastService } from '../../shared/toast/toast.service';
         </tbody>
       </table>
     </div>
+
+    <!-- Tarjetas (móvil / tablet) -->
+    <ul class="mt-4 space-y-3 lg:hidden">
+      @for (c of filtered(); track c.id) {
+        <li class="card p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="truncate font-medium text-on-surface">{{ c.name }}</p>
+              <p class="font-mono text-xs text-on-surface-variant">{{ c.courseCode }}</p>
+            </div>
+            <span [class]="statusBadge[c.status]">{{ statusLabels[c.status] }}</span>
+          </div>
+          <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div><dt class="text-on-surface-variant">Periodo</dt><dd class="text-on-surface">{{ c.academicPeriodName || '—' }}</dd></div>
+            <div><dt class="text-on-surface-variant">Ciclo</dt><dd class="text-on-surface">{{ semesterLabel(c.semester) }}</dd></div>
+            <div><dt class="text-on-surface-variant">Carrera</dt><dd class="truncate text-on-surface">{{ c.careerName || 'Sin carrera' }}</dd></div>
+            <div><dt class="text-on-surface-variant">Sección / Aula</dt><dd class="text-on-surface">{{ c.section || '—' }}{{ c.room ? ' · ' + c.room : '' }}</dd></div>
+            <div class="col-span-2"><dt class="text-on-surface-variant">Docente(s)</dt><dd class="text-on-surface">{{ teacherNames(c) }}</dd></div>
+            @if (!isStudent()) {
+              <div><dt class="text-on-surface-variant">Estudiantes</dt><dd class="text-on-surface">{{ studentCount().get(c.id) ?? 0 }}</dd></div>
+            }
+          </dl>
+          <div class="mt-3 flex flex-wrap justify-end gap-2 border-t border-outline-variant/50 pt-3">
+            <a [routerLink]="['/courses', c.id]" class="btn btn-secondary btn-sm">Ver detalle</a>
+            @if (isAdmin()) {
+              <a [routerLink]="['/courses', c.id, 'edit']" class="btn btn-secondary btn-sm">Editar</a>
+              <a routerLink="/teacher-assignments" [queryParams]="{ courseId: c.id }" class="btn btn-secondary btn-sm">Asignar</a>
+              <button type="button" class="btn btn-secondary btn-sm" [disabled]="busy()" (click)="toggleStatus(c)">
+                {{ c.status === 'ACTIVE' ? 'Desactivar' : 'Activar' }}
+              </button>
+            }
+          </div>
+        </li>
+      } @empty {
+        <li class="card text-center text-sm text-on-surface-variant">No hay cursos con estos filtros.</li>
+      }
+    </ul>
   `,
 })
 export class CoursesList {

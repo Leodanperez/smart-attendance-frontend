@@ -116,6 +116,47 @@ export class SessionService {
   }
 
   /**
+   * Cierra la sesión y marca ABSENT (falta) a los estudiantes inscritos que no registraron.
+   * Modo demo sin Cloud Functions: lo ejecuta el docente desde el panel. Cada falta se crea con
+   * motivo ("Cierre de sesión") para cumplir las reglas de corrección (updatedBy/updateReason).
+   * @param absentStudentIds ids de inscritos ACTIVE sin registro de asistencia.
+   */
+  async closeAndMarkAbsent(session: ClassSession, absentStudentIds: readonly string[]): Promise<void> {
+    const uid = this.auth.currentUser()?.uid;
+    if (!uid) throw { code: 'functions/unauthenticated' };
+
+    const batch = this.run(() => writeBatch(this.firestore));
+    // 1) Cerrar la sesión.
+    batch.update(this.run(() => doc(this.firestore, 'sessions', session.id)), {
+      status: 'CLOSED',
+      closedAt: serverTimestamp(),
+    });
+    this.audit.addToBatch(batch, {
+      action: 'SESSION_CLOSED',
+      entityType: 'SESSION',
+      entityId: session.id,
+      details: { courseId: session.courseId, markedAbsent: absentStudentIds.length },
+    });
+    // 2) Marcar falta a cada inscrito sin registro.
+    for (const studentId of absentStudentIds) {
+      const id = `${session.id}_${studentId}`;
+      batch.set(this.run(() => doc(this.firestore, 'attendances', id)), {
+        sessionId: session.id,
+        courseId: session.courseId,
+        studentId,
+        status: 'ABSENT',
+        source: 'MANUAL',
+        registeredAt: serverTimestamp(),
+        updatedBy: uid,
+        updateReason: 'Cierre de sesión: sin registro de asistencia.',
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    await this.revokeActiveTokens(session.id);
+  }
+
+  /**
    * Genera un token temporal para el QR y guarda solo su hash en sessionTokens.
    * Sin Cloud Functions (modo demo, plan gratuito): lo crea el panel del docente.
    * El token en claro se devuelve una vez para dibujar el QR; nunca se guarda.

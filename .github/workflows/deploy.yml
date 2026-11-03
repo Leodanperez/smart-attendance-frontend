@@ -1,9 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Publica el panel Angular en GitHub Pages en cada push a main.
+# Despliegue a Vercel está activo (auto en cada push desde la integración de Vercel).
+# Este workflow de GitHub Pages queda SOLO manual para no desplegar en dos sitios a la vez.
+# Ejecútalo desde la pestaña Actions si alguna vez quieres publicar también en Pages.
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:

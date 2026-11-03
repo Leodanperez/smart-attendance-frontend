@@ -41,7 +41,8 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
       <p role="alert" class="alert-error mt-4">{{ scope.error() }}</p>
     }
 
-    <div class="table-wrap mt-4">
+    <!-- Tabla (escritorio) -->
+    <div class="table-wrap mt-4 hidden md:block">
       <table class="table">
         <thead>
           <tr>
@@ -71,6 +72,28 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
         </tbody>
       </table>
     </div>
+
+    <!-- Tarjetas (móvil) -->
+    <ul class="mt-4 space-y-3 md:hidden">
+      @for (r of rows(); track r.key) {
+        <li class="card p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="truncate font-medium text-on-surface">{{ r.name }}</p>
+              <p class="truncate text-xs text-on-surface-variant">{{ r.email }}</p>
+            </div>
+            <span [class]="r.low ? 'badge badge-red' : 'badge badge-green'">{{ percent(r.percentage) }}</span>
+          </div>
+          <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div><dt class="text-on-surface-variant">Código</dt><dd class="font-mono text-on-surface">{{ r.code || '—' }}</dd></div>
+            <div><dt class="text-on-surface-variant">Sesiones válidas</dt><dd class="text-on-surface">{{ r.validSessions }}</dd></div>
+            <div class="col-span-2"><dt class="text-on-surface-variant">Curso</dt><dd class="truncate text-on-surface">{{ r.course }}</dd></div>
+          </dl>
+        </li>
+      } @empty {
+        <li class="card text-center text-sm text-on-surface-variant">Sin estudiantes.</li>
+      }
+    </ul>
     <p class="mt-2 text-xs text-on-surface-variant">{{ rule }}</p>
   `,
 })

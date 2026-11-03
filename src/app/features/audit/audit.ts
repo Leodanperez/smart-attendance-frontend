@@ -57,7 +57,8 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
       <p role="alert" class="alert-error mt-4">{{ error() }}</p>
     }
 
-    <div class="table-wrap mt-4">
+    <!-- Tabla (escritorio) -->
+    <div class="table-wrap mt-4 hidden lg:block">
       <table class="table">
         <thead>
           <tr>
@@ -88,6 +89,29 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
         </tbody>
       </table>
     </div>
+
+    <!-- Tarjetas (móvil / tablet) -->
+    <ul class="mt-4 space-y-3 lg:hidden">
+      @for (log of filtered(); track log.id) {
+        <li class="card p-4">
+          <div class="flex items-start justify-between gap-2">
+            <p class="font-medium text-on-surface">{{ actionLabel(log.action) }}</p>
+            <span class="shrink-0 text-xs text-on-surface-variant whitespace-nowrap">{{ log.createdAt | tsDate | date: 'dd/MM HH:mm' }}</span>
+          </div>
+          <p class="mt-1 text-sm text-on-surface-variant">{{ log.actorName || log.actorId }}</p>
+          <p class="mt-2 text-xs text-on-surface-variant">
+            {{ entityLabel(log.entityType) }}
+            <span class="block font-mono break-all">{{ log.entityId }}</span>
+          </p>
+          @if (log.reason) {
+            <p class="mt-1 text-xs text-on-surface">Motivo: {{ log.reason }}</p>
+          }
+          <p class="mt-1 font-mono text-[11px] break-all text-on-surface-variant">{{ details(log) }}</p>
+        </li>
+      } @empty {
+        <li class="card text-center text-sm text-on-surface-variant">Sin eventos.</li>
+      }
+    </ul>
   `,
 })
 export class Audit {

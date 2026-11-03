@@ -118,7 +118,8 @@ import { ToastService } from '../../shared/toast/toast.service';
             <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="enroll(st.value); st.value = ''">Inscribir</button>
           </div>
 
-          <div class="mt-4 overflow-x-auto">
+          <!-- Tabla (escritorio) -->
+          <div class="mt-4 hidden overflow-x-auto md:block">
             <table class="table">
               <thead>
                 <tr>
@@ -150,6 +151,31 @@ import { ToastService } from '../../shared/toast/toast.service';
               </tbody>
             </table>
           </div>
+
+          <!-- Tarjetas (móvil) -->
+          <ul class="mt-4 space-y-3 md:hidden">
+            @for (row of rows(); track row.enrollment.id) {
+              <li class="rounded-xl border border-outline-variant/50 p-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-on-surface">{{ row.name }}</p>
+                    <p class="truncate text-xs text-on-surface-variant">{{ row.email }}</p>
+                  </div>
+                  <span class="badge badge-gray shrink-0">{{ enrollmentLabels[row.enrollment.status] }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between gap-2">
+                  <p class="text-xs text-on-surface-variant">
+                    <span class="font-mono">{{ row.code || '—' }}</span> · {{ row.enrollment.enrolledAt | tsDate | date: 'dd/MM/yyyy' }}
+                  </p>
+                  @if (row.enrollment.status === 'ACTIVE') {
+                    <button type="button" class="btn btn-secondary btn-sm" [disabled]="busy()" (click)="drop(row.enrollment, row.name)">Retirar</button>
+                  }
+                </div>
+              </li>
+            } @empty {
+              <li class="text-center text-sm text-on-surface-variant">Sin estudiantes inscritos.</li>
+            }
+          </ul>
         </section>
       </div>
     }

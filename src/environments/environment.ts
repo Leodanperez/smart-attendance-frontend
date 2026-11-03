@@ -13,8 +13,8 @@ export const environment = {
   },
   /** Site key de reCAPTCHA Enterprise para App Check. Vacío = App Check desactivado. */
   recaptchaEnterpriseSiteKey: '',
-  /** URL del APK de la app Android (Release de GitHub o /app-release.apk en public/). */
-  apkUrl: 'app-release.apk',
+  /** URL del APK de la app Android (raíz del sitio; el archivo vive en public/). */
+  apkUrl: '/app-release.apk',
   /** Versión del APK mostrada en la página de descarga. */
   apkVersion: '1.0.0',
 };

@@ -6,7 +6,7 @@ import {
   LOCALE_ID,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding, withHashLocation } from '@angular/router';
+import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
 import { ReCaptchaEnterpriseProvider, initializeAppCheck, provideAppCheck } from '@angular/fire/app-check';
 import { getAuth, provideAuth } from '@angular/fire/auth';
@@ -33,8 +33,9 @@ const appCheckProviders: EnvironmentProviders[] = environment.recaptchaEnterpris
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    // Hash routing (#/dashboard): funciona en GitHub Pages sin 404 al recargar.
-    provideRouter(routes, withComponentInputBinding(), withHashLocation()),
+    // Rutas limpias (/dashboard). En Vercel, vercel.json reescribe todo a index.html
+    // para que recargar o entrar directo a una ruta profunda no dé 404.
+    provideRouter(routes, withComponentInputBinding()),
     { provide: LOCALE_ID, useValue: 'es-PE' },
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     ...appCheckProviders,

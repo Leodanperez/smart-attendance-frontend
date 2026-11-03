@@ -53,6 +53,7 @@ export const NAVIGATION: NavGroup[] = [
       { label: 'Carreras', path: '/careers', icon: GraduationCap, roles: ['ADMIN'] },
       { label: 'Cursos', path: '/courses', icon: BookOpen, roles: ['ADMIN'] },
       { label: 'Mis cursos', path: '/courses', icon: BookOpen, roles: ['TEACHER', 'STUDENT'] },
+      { label: 'Mi horario', path: '/my-schedule', icon: CalendarDays, roles: ['STUDENT'] },
       { label: 'Asignación de docentes', path: '/teacher-assignments', icon: UserCog, roles: ['ADMIN'] },
       { label: 'Inscripciones', path: '/enrollments', icon: ClipboardList, roles: ['ADMIN'] },
       { label: 'Estudiantes', path: '/students', icon: Users, roles: ['TEACHER'] },
@@ -61,6 +62,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: 'Asistencia',
     items: [
+      { label: 'Mi asistencia', path: '/my-attendance', icon: ClipboardList, roles: ['STUDENT'] },
       { label: 'Sesiones', path: '/sessions', icon: CalendarClock, roles: ['ADMIN', 'TEACHER'] },
       { label: 'Asistencia en vivo', path: '/live-attendance', icon: Radio, roles: ['ADMIN', 'TEACHER'] },
       { label: 'Reportes', path: '/reports', icon: ChartColumn, roles: ['ADMIN', 'TEACHER'] },
