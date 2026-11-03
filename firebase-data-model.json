@@ -430,6 +430,11 @@
           "required": true,
           "description": "Ej: A"
         },
+        "schedule": {
+          "type": "array<ScheduleBlock>",
+          "required": false,
+          "description": "Horario semanal del curso. Cada bloque = { day: 'MON'|'TUE'|'WED'|'THU'|'FRI'|'SAT'|'SUN', start: 'HH:mm', end: 'HH:mm' }. Puede estar vacío."
+        },
         "teacherIds": {
           "type": "array<string>",
           "required": true,
@@ -468,6 +473,10 @@
         "careerName": "Desarrollo de Sistemas de Información",
         "semester": 6,
         "section": "A",
+        "schedule": [
+          { "day": "MON", "start": "08:00", "end": "10:00" },
+          { "day": "WED", "start": "10:00", "end": "12:00" }
+        ],
         "teacherIds": [
           "uid-docente-01"
         ],

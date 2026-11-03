@@ -178,6 +178,11 @@ export class CourseService {
       section: input.section.trim().toUpperCase(),
       teacherIds: [...new Set(input.teacherIds)],
       status: input.status,
+      schedule: (input.schedule ?? []).map((b) => ({
+        day: b.day,
+        start: b.start,
+        end: b.end,
+      })),
     };
   }
 

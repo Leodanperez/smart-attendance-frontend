@@ -147,8 +147,6 @@ service cloud.firestore {
         && request.resource.data.source == 'QR'
         && request.resource.data.status in ['PRESENT', 'LATE']
         && request.resource.data.registeredAt == request.time
-        && request.resource.data.updatedBy == null
-        && request.resource.data.updateReason == null
         && enrolledIn(request.resource.data.courseId)
         && sessionData(request.resource.data.sessionId).courseId == request.resource.data.courseId
         && sessionData(request.resource.data.sessionId).status == 'ACTIVE'

@@ -12,6 +12,35 @@ export const COURSE_STATUS_BADGE: Record<CourseStatus, string> = {
   INACTIVE: 'badge badge-gray',
 };
 
+export const WEEK_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+export type WeekDay = (typeof WEEK_DAYS)[number];
+
+export const WEEK_DAY_LABELS: Record<WeekDay, string> = {
+  MON: 'Lunes',
+  TUE: 'Martes',
+  WED: 'Miércoles',
+  THU: 'Jueves',
+  FRI: 'Viernes',
+  SAT: 'Sábado',
+  SUN: 'Domingo',
+};
+export const WEEK_DAY_SHORT: Record<WeekDay, string> = {
+  MON: 'Lun',
+  TUE: 'Mar',
+  WED: 'Mié',
+  THU: 'Jue',
+  FRI: 'Vie',
+  SAT: 'Sáb',
+  SUN: 'Dom',
+};
+
+/** Bloque de horario: día y rango de horas en formato HH:mm. */
+export interface ScheduleBlock {
+  day: WeekDay;
+  start: string; // HH:mm
+  end: string; // HH:mm
+}
+
 /** Documento courses/{courseId} (modelo 6.2). */
 export interface Course {
   id: string;
@@ -29,6 +58,8 @@ export interface Course {
   /** Copia del nombre del periodo ("2026-II"). */
   academicPeriodName: string | null;
   section: string;
+  /** Horario semanal del curso (puede tener varios bloques). */
+  schedule: ScheduleBlock[];
   teacherIds: string[];
   status: CourseStatus;
   createdBy: string | null;
@@ -49,6 +80,7 @@ export type CourseInput = Pick<
   | 'semester'
   | 'academicPeriodId'
   | 'academicPeriodName'
+  | 'schedule'
 >;
 
 /** Palabras que no aportan a las iniciales. */
@@ -104,9 +136,26 @@ export function normalizeCourse(data: Record<string, unknown>, id: string): Cour
       (data['academicPeriodName'] as string | null | undefined) ??
       ((data['academicPeriodId'] as string | null | undefined) ?? null),
     section: (data['section'] as string | undefined) ?? '',
+    schedule: normalizeSchedule(data['schedule']),
     teacherIds: Array.isArray(data['teacherIds']) ? (data['teacherIds'] as string[]) : [],
     status: data['status'] === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
   };
+}
+
+const WEEK_ORDER: Record<WeekDay, number> = { MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6, SUN: 7 };
+
+function normalizeSchedule(value: unknown): ScheduleBlock[] {
+  if (!Array.isArray(value)) return [];
+  return (value as Record<string, unknown>[])
+    .filter((b) => (WEEK_DAYS as readonly string[]).includes(b?.['day'] as string) && typeof b?.['start'] === 'string' && typeof b?.['end'] === 'string')
+    .map((b) => ({ day: b['day'] as WeekDay, start: b['start'] as string, end: b['end'] as string }))
+    .sort((a, b) => WEEK_ORDER[a.day] - WEEK_ORDER[b.day] || a.start.localeCompare(b.start));
+}
+
+/** "Lun 08:00–10:00 · Mié 10:00–12:00" o "Sin horario". */
+export function scheduleLabel(schedule: readonly ScheduleBlock[] | undefined): string {
+  if (!schedule?.length) return 'Sin horario';
+  return schedule.map((b) => `${WEEK_DAY_SHORT[b.day]} ${b.start}–${b.end}`).join(' · ');
 }
 
 export function courseLabel(course: Pick<Course, 'courseCode' | 'name' | 'section'> | undefined): string {

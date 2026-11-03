@@ -91,7 +91,7 @@ export class SessionQr implements OnDestroy {
       const seconds = this.settings().qrRefreshSeconds;
       const { token, expiresAt } = await this.sessionService.requestQrToken(this.sessionId(), this.courseId(), seconds);
       if (!this.running()) return;
-      const payload = this.sessionService.buildQrPayload(this.sessionId(), token);
+      const payload = this.sessionService.buildQrPayload(this.sessionId(), this.courseId(), token);
       this.image.set(await toDataURL(payload, { width: 320, margin: 1, errorCorrectionLevel: 'M' }));
 
       this.expiresAt = expiresAt;

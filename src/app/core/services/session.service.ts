@@ -136,9 +136,12 @@ export class SessionService {
     return { token, expiresAt };
   }
 
-  /** Lo que se codifica en el QR: sesión + token, en una línea compacta. */
-  buildQrPayload(sessionId: string, token: string): string {
-    return `SA1|${sessionId}|${token}`;
+  /**
+   * Lo que se codifica en el QR (contrato compartido con la app Android).
+   * JSON: { v: 1, sessionId, courseId, token }. La app lo parsea y escribe la asistencia.
+   */
+  buildQrPayload(sessionId: string, courseId: string, token: string): string {
+    return JSON.stringify({ v: 1, sessionId, courseId, token });
   }
 
   /** Comprueba si existe un token ACTIVE y vigente para la sesión (diagnóstico opcional). */

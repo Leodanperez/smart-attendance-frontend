@@ -7,7 +7,7 @@ import { catchError, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ATTENDANCE_RULE_TEXT, ATTENDANCE_STATUS_BADGE, ATTENDANCE_STATUS_LABELS } from '../../core/models/attendance.model';
 import { semesterLabel } from '../../core/models/career.model';
-import { COURSE_STATUS_BADGE, COURSE_STATUS_LABELS, Course } from '../../core/models/course.model';
+import { COURSE_STATUS_BADGE, COURSE_STATUS_LABELS, Course, WEEK_DAY_LABELS } from '../../core/models/course.model';
 import { SESSION_STATUS_BADGE, SESSION_STATUS_LABELS } from '../../core/models/session.model';
 import { fullName } from '../../core/models/user.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
@@ -50,6 +50,14 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
           @if (c.description) {
             <p class="mt-2 max-w-2xl text-sm text-on-surface">{{ c.description }}</p>
           }
+          <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+            <span class="font-medium text-on-surface">Horario:</span>
+            @for (b of c.schedule; track $index) {
+              <span class="badge badge-gray">{{ weekDayLabels[b.day] }} {{ b.start }}–{{ b.end }}</span>
+            } @empty {
+              <span>Sin horario definido</span>
+            }
+          </p>
         </div>
         @if (canManage()) {
           <div class="flex flex-wrap gap-2">
@@ -156,6 +164,7 @@ export class CourseDetail {
 
   protected readonly rule = ATTENDANCE_RULE_TEXT;
   protected readonly semesterLabel = semesterLabel;
+  protected readonly weekDayLabels = WEEK_DAY_LABELS;
   protected readonly percent = percentLabel;
   protected readonly courseStatus = COURSE_STATUS_LABELS;
   protected readonly courseBadge = COURSE_STATUS_BADGE;

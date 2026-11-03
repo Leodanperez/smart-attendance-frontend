@@ -9,6 +9,10 @@ import {
   COURSE_STATUS_LABELS,
   Course,
   CourseStatus,
+  ScheduleBlock,
+  WEEK_DAYS,
+  WEEK_DAY_LABELS,
+  WeekDay,
   courseCodePreview,
 } from '../../core/models/course.model';
 import { PERIOD_STATUS_LABELS } from '../../core/models/academic-period.model';
@@ -137,6 +141,43 @@ import { ToastService } from '../../shared/toast/toast.service';
             </div>
           </fieldset>
 
+          <fieldset class="sm:col-span-2">
+            <legend class="label">Horario semanal</legend>
+            <p class="hint mb-2">Agrega los bloques en que se dicta el curso (día y rango de horas).</p>
+            <div class="space-y-2">
+              @for (block of schedule(); track $index) {
+                <div class="flex flex-wrap items-end gap-2 rounded-md border border-outline-variant p-2">
+                  <div class="min-w-32 flex-1">
+                    <label class="label text-xs" [attr.for]="'sch-day-' + $index">Día</label>
+                    <select [id]="'sch-day-' + $index" class="input" [value]="block.day"
+                      (change)="updateBlock($index, 'day', $any($event.target).value)">
+                      @for (d of weekDays; track d) {
+                        <option [value]="d">{{ weekDayLabels[d] }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="w-28">
+                    <label class="label text-xs" [attr.for]="'sch-start-' + $index">Inicio</label>
+                    <input [id]="'sch-start-' + $index" type="time" class="input" [value]="block.start"
+                      (change)="updateBlock($index, 'start', $any($event.target).value)" />
+                  </div>
+                  <div class="w-28">
+                    <label class="label text-xs" [attr.for]="'sch-end-' + $index">Fin</label>
+                    <input [id]="'sch-end-' + $index" type="time" class="input" [value]="block.end"
+                      (change)="updateBlock($index, 'end', $any($event.target).value)" />
+                  </div>
+                  <button type="button" class="btn btn-secondary" (click)="removeBlock($index)">Quitar</button>
+                </div>
+              } @empty {
+                <p class="text-sm text-on-surface-variant">Sin horario definido.</p>
+              }
+            </div>
+            <button type="button" class="btn btn-secondary mt-2" (click)="addBlock()">+ Agregar bloque</button>
+            @if (scheduleError()) {
+              <p class="error mt-1">{{ scheduleError() }}</p>
+            }
+          </fieldset>
+
           @if (error()) {
             <p role="alert" class="alert-error sm:col-span-2">{{ error() }}</p>
           }
@@ -170,6 +211,11 @@ export class CourseForm {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly selected = signal(new Set<string>());
+  protected readonly schedule = signal<ScheduleBlock[]>([]);
+  protected readonly scheduleError = signal<string | null>(null);
+
+  protected readonly weekDays = WEEK_DAYS;
+  protected readonly weekDayLabels = WEEK_DAY_LABELS;
 
   private readonly teachers = toSignal(this.scope.teachers$, { initialValue: [] });
   protected readonly activeTeachers = computed(() =>
@@ -246,6 +292,7 @@ export class CourseForm {
         status: course.status,
       });
       this.selected.set(new Set(course.teacherIds));
+      this.schedule.set(course.schedule.map((b) => ({ ...b })));
     });
   }
 
@@ -263,11 +310,35 @@ export class CourseForm {
     });
   }
 
+  protected addBlock(): void {
+    this.scheduleError.set(null);
+    this.schedule.update((list) => [...list, { day: 'MON', start: '08:00', end: '10:00' }]);
+  }
+
+  protected removeBlock(index: number): void {
+    this.scheduleError.set(null);
+    this.schedule.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  protected updateBlock(index: number, field: keyof ScheduleBlock, value: string): void {
+    this.scheduleError.set(null);
+    this.schedule.update((list) =>
+      list.map((b, i) => (i === index ? { ...b, [field]: field === 'day' ? (value as WeekDay) : value } : b)),
+    );
+  }
+
   async submit(): Promise<void> {
     this.error.set(null);
+    this.scheduleError.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.error.set('Revisa los campos marcados.');
+      return;
+    }
+    const badBlock = this.schedule().find((b) => !b.start || !b.end || b.start >= b.end);
+    if (badBlock) {
+      this.scheduleError.set('Cada bloque necesita hora de inicio y fin, y el inicio debe ser antes del fin.');
+      this.error.set('Revisa el horario.');
       return;
     }
     this.saving.set(true);
@@ -290,6 +361,7 @@ export class CourseForm {
         academicPeriodName: period.name,
         careerName: career.name,
         teacherIds: [...this.selected()],
+        schedule: this.schedule(),
       };
       const course = this.course();
       let id: string;
