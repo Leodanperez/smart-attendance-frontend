@@ -74,7 +74,7 @@ interface Row {
             @if (s.lateAfter) { · tardanza desde {{ s.lateAfter | tsDate | date: 'HH:mm' }} }
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           @if (s.status === 'ACTIVE') {
             <span class="inline-flex items-center gap-1.5 rounded-full bg-status-active/10 px-3 py-1 text-xs font-bold text-status-active"
               role="status" aria-label="Actualización en tiempo real activa">
@@ -158,8 +158,8 @@ interface Row {
                       } @else {
                         <span [class]="statusBadge[r.status]">{{ statusLabels[r.status] }}</span>
                       }
-                      @if (r.record?.updateReason) {
-                        <span class="block text-xs text-on-surface-variant" [title]="r.record?.updateReason ?? ''">Corregida</span>
+                      @if (r.record?.updateReason; as reason) {
+                        <span class="block text-xs text-on-surface-variant" [title]="reason">Corregida</span>
                       }
                     </td>
                     <td>{{ r.record ? sourceLabels[r.record.source] || r.record.source : '—' }}</td>
@@ -327,16 +327,23 @@ export class LiveAttendance {
   }
 
   async close(session: ClassSession): Promise<void> {
+    // Inscritos sin registro: quedarán marcados como falta (ABSENT) al cerrar.
+    const absentIds = this.rows().filter((r) => r.status === 'PENDING').map((r) => r.studentId);
     const ok = await this.dialogs.confirm({
-      title: 'Cerrar sesión de clase',
-      message: `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
-      confirmText: 'Cerrar sesión',
+      title: 'Cerrar sesión y marcar faltas',
+      message:
+        absentIds.length > 0
+          ? `"${session.title}" se cerrará. ${absentIds.length} estudiante(s) sin registro quedarán marcados como falta. Podrás corregir con un motivo después.`
+          : `"${session.title}" se cerrará y ya no se podrá registrar asistencia por QR.`,
+      confirmText: 'Cerrar y marcar faltas',
       tone: 'danger',
     });
     if (!ok) return;
     await this.run(async () => {
-      await this.sessionService.close(session);
-      return 'Sesión cerrada.';
+      await this.sessionService.closeAndMarkAbsent(session, absentIds);
+      return absentIds.length > 0
+        ? `Sesión cerrada. ${absentIds.length} falta(s) registrada(s).`
+        : 'Sesión cerrada.';
     });
   }
 

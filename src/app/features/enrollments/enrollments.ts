@@ -106,7 +106,7 @@ import { ToastService } from '../../shared/toast/toast.service';
           </div>
 
           <div class="mt-3 flex flex-wrap items-end gap-2">
-            <div class="min-w-64 flex-1">
+            <div class="w-full flex-1 sm:w-auto sm:min-w-64">
               <label for="student" class="label">Inscribir estudiante manualmente</label>
               <select id="student" class="input" #st>
                 <option value="">Selecciona un estudiante activo</option>

@@ -32,7 +32,7 @@ import { ToastService } from '../../shared/toast/toast.service';
         <label for="t-search" class="sr-only">Buscar docente</label>
         <input id="t-search" type="search" class="input mt-3" placeholder="Buscar por nombre o correo"
           #q (input)="search.set(q.value)" />
-        <ul class="mt-3 max-h-[28rem] space-y-1 overflow-y-auto" role="listbox" aria-label="Docentes">
+        <ul class="mt-3 max-h-112 space-y-1 overflow-y-auto" role="listbox" aria-label="Docentes">
           @for (t of filteredTeachers(); track t.uid) {
             <li>
               <button type="button" role="option" [attr.aria-selected]="t.uid === teacherId()"
@@ -56,7 +56,7 @@ import { ToastService } from '../../shared/toast/toast.service';
           <p class="text-sm text-on-surface-variant">{{ t.email }}</p>
 
           <div class="mt-4 flex flex-wrap items-end gap-2">
-            <div class="min-w-64 flex-1">
+            <div class="w-full flex-1 sm:w-auto sm:min-w-64">
               <label for="course" class="label">Seleccionar curso</label>
               <select id="course" class="input" #sel [value]="courseId()" (change)="courseId.set(sel.value)">
                 <option value="">Selecciona un curso activo</option>
