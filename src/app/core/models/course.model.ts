@@ -58,9 +58,13 @@ export interface Course {
   /** Copia del nombre del periodo ("2026-II"). */
   academicPeriodName: string | null;
   section: string;
+  /** Aula o salón de esta sección (opcional). */
+  room: string;
   /** Horario semanal del curso (puede tener varios bloques). */
   schedule: ScheduleBlock[];
   teacherIds: string[];
+  /** Nombre del docente (denormalizado para la app móvil; evita leer users/{uid}). */
+  teacherName: string;
   status: CourseStatus;
   createdBy: string | null;
   createdAt: Timestamp | null;
@@ -73,6 +77,7 @@ export type CourseInput = Pick<
   | 'name'
   | 'description'
   | 'section'
+  | 'room'
   | 'teacherIds'
   | 'status'
   | 'careerId'
@@ -81,6 +86,7 @@ export type CourseInput = Pick<
   | 'academicPeriodId'
   | 'academicPeriodName'
   | 'schedule'
+  | 'teacherName'
 >;
 
 /** Palabras que no aportan a las iniciales. */
@@ -136,8 +142,10 @@ export function normalizeCourse(data: Record<string, unknown>, id: string): Cour
       (data['academicPeriodName'] as string | null | undefined) ??
       ((data['academicPeriodId'] as string | null | undefined) ?? null),
     section: (data['section'] as string | undefined) ?? '',
+    room: (data['room'] as string | undefined) ?? '',
     schedule: normalizeSchedule(data['schedule']),
     teacherIds: Array.isArray(data['teacherIds']) ? (data['teacherIds'] as string[]) : [],
+    teacherName: (data['teacherName'] as string | undefined) ?? '',
     status: data['status'] === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
   };
 }

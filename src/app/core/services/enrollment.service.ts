@@ -101,9 +101,13 @@ export class EnrollmentService {
   /**
    * Genera un código aleatorio seguro. Solo se guarda su hash SHA-256;
    * el código en texto plano se devuelve una única vez para mostrarlo.
-   * La validación al canjear la hace la Cloud Function.
+   * El canje lo hace el propio estudiante desde la app (modo demo, sin Cloud Functions):
+   * busca el código por su hash, crea su inscripción (source=CODE) e incrementa 'uses'.
+   * Las reglas de Firestore validan vigencia, cupo y pertenencia al curso.
    */
   async generateCode(courseId: string, validDays: number, maxUses: number): Promise<string> {
+    const uid = this.auth.currentUser()?.uid;
+    if (!uid) throw { code: 'functions/unauthenticated' };
     const code = randomCode(8);
     const codeHash = await sha256Hex(code);
     const expiresAt = Timestamp.fromMillis(Date.now() + validDays * 24 * 60 * 60 * 1000);
@@ -117,7 +121,7 @@ export class EnrollmentService {
       expiresAt,
       maxUses,
       uses: 0,
-      createdBy: this.auth.currentUser()?.uid ?? null,
+      createdBy: uid,
       createdAt: serverTimestamp(),
     });
     this.audit.addToBatch(batch, {

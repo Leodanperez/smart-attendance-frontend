@@ -137,12 +137,12 @@ export class CourseService {
     await batch.commit();
   }
 
-  async assignTeacher(course: Course, teacherId: string): Promise<void> {
-    await this.changeTeacher(course, teacherId, true, null);
+  async assignTeacher(course: Course, teacherId: string, teacherName = ''): Promise<void> {
+    await this.changeTeacher(course, teacherId, true, null, teacherName);
   }
 
   async removeTeacher(course: Course, teacherId: string, reason: string | null): Promise<void> {
-    await this.changeTeacher(course, teacherId, false, reason);
+    await this.changeTeacher(course, teacherId, false, reason, '');
   }
 
   private async changeTeacher(
@@ -150,10 +150,18 @@ export class CourseService {
     teacherId: string,
     assign: boolean,
     reason: string | null,
+    teacherName: string,
   ): Promise<void> {
+    // teacherName se denormaliza para que la app móvil muestre el docente sin leer users/{uid}
+    // (privacidad: un estudiante no puede leer perfiles de docentes).
+    const nextIds = assign
+      ? [...new Set([...course.teacherIds, teacherId])]
+      : course.teacherIds.filter((id) => id !== teacherId);
     const batch = this.run(() => writeBatch(this.firestore));
     batch.update(this.run(() => doc(this.firestore, 'courses', course.id)), {
       teacherIds: assign ? arrayUnion(teacherId) : arrayRemove(teacherId),
+      // Nombre del primer docente restante (vacío si ya no quedan).
+      teacherName: assign ? (teacherName || course.teacherName || '') : (nextIds.length ? course.teacherName : ''),
       updatedAt: serverTimestamp(),
     });
     this.audit.addToBatch(batch, {
@@ -176,7 +184,9 @@ export class CourseService {
       academicPeriodId: input.academicPeriodId,
       academicPeriodName: input.academicPeriodName,
       section: input.section.trim().toUpperCase(),
+      room: input.room?.trim() ?? '',
       teacherIds: [...new Set(input.teacherIds)],
+      teacherName: input.teacherName?.trim() ?? '',
       status: input.status,
       schedule: (input.schedule ?? []).map((b) => ({
         day: b.day,

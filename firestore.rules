@@ -35,11 +35,12 @@ service cloud.firestore {
 
     // ---------- users/{uid} ----------
     match /users/{uid} {
+      // Lectura de perfiles: el propio usuario, ADMIN, o un docente sobre perfiles STUDENT/TEACHER
+      // (para resolver nombres de alumnos/colegas). Un estudiante NO lee perfiles de docentes.
       allow get: if signedIn() && (
         request.auth.uid == uid
         || isAdmin()
         || (isTeacher() && resource.data.role in ['STUDENT', 'TEACHER'])
-        || (isActive() && resource.data.role == 'TEACHER')
       );
       allow list: if isAdmin();
 
@@ -72,28 +73,60 @@ service cloud.firestore {
     }
 
     // ---------- enrollments/{courseId_studentId} ----------
+    function codeData(codeId) { return get(/databases/$(database)/documents/enrollmentCodes/$(codeId)).data; }
+    // Modo demo sin Cloud Functions: un código de inscripción es válido si está ACTIVE, vigente y con cupo.
+    function enrollmentCodeValid(codeId, courseId) {
+      let c = codeData(codeId);
+      return c.status == 'ACTIVE' && c.courseId == courseId && c.expiresAt > request.time && c.uses < c.maxUses;
+    }
+
     match /enrollments/{enrollmentId} {
       allow read: if isAdmin()
         || teaches(resource.data.courseId)
         || (signedIn() && resource.data.studentId == request.auth.uid);
-      // El canje de códigos lo hace la Cloud Function (Admin SDK). Desde el cliente solo ADMIN.
-      allow create, update: if isAdmin()
+
+      // ADMIN inscribe manualmente desde el panel.
+      allow create: if isAdmin()
+        && enrollmentId == request.resource.data.courseId + '_' + request.resource.data.studentId;
+
+      // Autoinscripción del estudiante con un código válido (modo demo, sin Cloud Functions).
+      // El id es determinístico (courseId_uid), status ACTIVE, source CODE, y el código referido
+      // debe estar ACTIVE, vigente, con cupo y pertenecer al mismo curso.
+      allow create: if isActive()
+        && request.resource.data.studentId == request.auth.uid
+        && enrollmentId == request.resource.data.courseId + '_' + request.auth.uid
+        && request.resource.data.status == 'ACTIVE'
+        && request.resource.data.source == 'CODE'
+        && request.resource.data.enrolledBy == request.auth.uid
+        && request.resource.data.codeId is string
+        && enrollmentCodeValid(request.resource.data.codeId, request.resource.data.courseId);
+
+      allow update: if isAdmin()
         && enrollmentId == request.resource.data.courseId + '_' + request.resource.data.studentId;
       allow delete: if false;
     }
 
     // ---------- enrollmentCodes/{codeId} ----------
     match /enrollmentCodes/{codeId} {
-      allow read: if isAdmin();
+      // Lectura: ADMIN, o un usuario activo que busca por codeHash para canjear (solo metadatos + hash).
+      allow read: if isAdmin() || isActive();
       allow create: if isAdmin()
         && request.resource.data.status == 'ACTIVE'
         && request.resource.data.uses == 0
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.codeHash is string
         && request.resource.data.codeHash.size() == 64;
+      // ADMIN deshabilita el código.
       allow update: if isAdmin()
         && changedKeys().hasOnly(['status'])
         && request.resource.data.status == 'DISABLED';
+      // El estudiante que canjea incrementa 'uses' en 1 (sin exceder el cupo), con el código vigente.
+      allow update: if isActive()
+        && changedKeys().hasOnly(['uses'])
+        && resource.data.status == 'ACTIVE'
+        && resource.data.expiresAt > request.time
+        && request.resource.data.uses == resource.data.uses + 1
+        && request.resource.data.uses <= resource.data.maxUses;
       allow delete: if false;
     }
 

@@ -32,7 +32,11 @@ import { ToastService } from '../../shared/toast/toast.service';
   template: `
     <div class="mx-auto max-w-3xl">
       <a routerLink="/courses" class="text-sm text-primary hover:underline">← Volver a cursos</a>
-      <h1 class="page-title mt-2">{{ id() ? 'Editar curso' : 'Crear curso' }}</h1>
+      <h1 class="page-title mt-2">{{ id() ? 'Editar sección de curso' : 'Crear sección de curso' }}</h1>
+      <p class="page-subtitle mt-1">
+        Cada sección es un salón del curso en un ciclo y periodo, con su propio docente, horario y aula.
+        Si el mismo curso se dicta en varios salones, crea una sección por cada uno.
+      </p>
 
       @if (id() && course() === null) {
         <p class="alert-error mt-4">El curso no existe.</p>
@@ -116,6 +120,16 @@ import { ToastService } from '../../shared/toast/toast.service';
               [attr.aria-invalid]="invalid('section')" aria-describedby="section-error" />
             @if (invalid('section')) {
               <p id="section-error" class="error">Ingresa la sección (máx. 10 caracteres).</p>
+            } @else {
+              <p id="section-error" class="hint">Identifica el salón: A, B, C… Un salón = una sección.</p>
+            }
+          </div>
+          <div>
+            <label for="room" class="label">Aula</label>
+            <input id="room" formControlName="room" placeholder="Lab 1 / Aula 203" class="input"
+              [attr.aria-invalid]="invalid('room')" aria-describedby="room-error" />
+            @if (invalid('room')) {
+              <p id="room-error" class="error">El aula no debe superar 40 caracteres.</p>
             }
           </div>
           <div>
@@ -149,10 +163,10 @@ import { ToastService } from '../../shared/toast/toast.service';
                 <div class="flex flex-wrap items-end gap-2 rounded-md border border-outline-variant p-2">
                   <div class="min-w-32 flex-1">
                     <label class="label text-xs" [attr.for]="'sch-day-' + $index">Día</label>
-                    <select [id]="'sch-day-' + $index" class="input" [value]="block.day"
+                    <select [id]="'sch-day-' + $index" class="input"
                       (change)="updateBlock($index, 'day', $any($event.target).value)">
                       @for (d of weekDays; track d) {
-                        <option [value]="d">{{ weekDayLabels[d] }}</option>
+                        <option [value]="d" [selected]="d === block.day">{{ weekDayLabels[d] }}</option>
                       }
                     </select>
                   </div>
@@ -236,6 +250,7 @@ export class CourseForm {
     careerId: ['', Validators.required],
     semester: this.fb.control<number | null>(null, Validators.required),
     section: ['', [Validators.required, Validators.maxLength(10)]],
+    room: ['', [Validators.maxLength(40)]],
     status: this.fb.control<CourseStatus>('ACTIVE'),
   });
 
@@ -289,6 +304,7 @@ export class CourseForm {
         careerId: course.careerId ?? '',
         semester: course.semester,
         section: course.section,
+        room: course.room,
         status: course.status,
       });
       this.selected.set(new Set(course.teacherIds));
@@ -355,12 +371,16 @@ export class CourseForm {
       const period = this.periods().find((p) => p.id === value.academicPeriodId);
       if (!period) throw { code: 'app/not-found' };
       if (period.status === 'CLOSED' && period.id !== this.course()?.academicPeriodId) throw { code: 'app/period-closed' };
+      const selectedIds = [...this.selected()];
+      // Nombre del primer docente seleccionado (denormalizado para la app móvil).
+      const firstTeacher = this.teachers().find((t) => t.uid === selectedIds[0]);
       const input = {
         ...value,
         semester: value.semester,
         academicPeriodName: period.name,
         careerName: career.name,
-        teacherIds: [...this.selected()],
+        teacherIds: selectedIds,
+        teacherName: firstTeacher ? fullName(firstTeacher) : '',
         schedule: this.schedule(),
       };
       const course = this.course();

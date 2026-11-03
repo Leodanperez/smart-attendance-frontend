@@ -45,6 +45,9 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
               <span>· {{ semesterLabel(c.semester) }}</span>
             }
             <span>· Sección {{ c.section || '—' }}</span>
+            @if (c.room) {
+              <span>· Aula {{ c.room }}</span>
+            }
             <span [class]="courseBadge[c.status]">{{ courseStatus[c.status] }}</span>
           </p>
           @if (c.description) {

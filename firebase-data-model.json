@@ -428,7 +428,12 @@
         "section": {
           "type": "string",
           "required": true,
-          "description": "Ej: A"
+          "description": "Sección/salón del curso. Ej: A. Un documento course = una sección (un salón) del curso en un ciclo/periodo."
+        },
+        "room": {
+          "type": "string",
+          "required": false,
+          "description": "Aula o salón físico de la sección. Ej: 'Lab 1', 'Aula 203'. Puede estar vacío."
         },
         "schedule": {
           "type": "array<ScheduleBlock>",
@@ -473,6 +478,7 @@
         "careerName": "Desarrollo de Sistemas de Información",
         "semester": 6,
         "section": "A",
+        "room": "Lab 1",
         "schedule": [
           { "day": "MON", "start": "08:00", "end": "10:00" },
           { "day": "WED", "start": "10:00", "end": "12:00" }

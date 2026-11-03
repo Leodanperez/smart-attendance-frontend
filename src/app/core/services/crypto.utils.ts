@@ -13,7 +13,7 @@ export function randomCode(length = 8): string {
   return result.join('');
 }
 
-/** SHA-256 en hexadecimal. La Cloud Function debe aplicar el mismo hash al código en MAYÚSCULAS. */
+/** SHA-256 en hexadecimal. El código se hashea en MAYÚSCULAS (el cliente lo normaliza al canjear). */
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest))

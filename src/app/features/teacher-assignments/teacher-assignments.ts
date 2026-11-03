@@ -148,7 +148,7 @@ export class TeacherAssignments {
     });
     if (!ok) return;
     await this.run(async () => {
-      await this.courseService.assignTeacher(course, teacher.uid);
+      await this.courseService.assignTeacher(course, teacher.uid, fullName(teacher));
       this.courseId.set('');
       return `${fullName(teacher)} asignado a ${course.name}.`;
     });

@@ -111,6 +111,8 @@ export class SessionService {
       details: { courseId: session.courseId },
     });
     await batch.commit();
+    // Al cerrar, invalida los tokens de QR que siguieran activos.
+    await this.revokeActiveTokens(session.id);
   }
 
   /**
@@ -119,6 +121,10 @@ export class SessionService {
    * El token en claro se devuelve una vez para dibujar el QR; nunca se guarda.
    */
   async requestQrToken(sessionId: string, courseId: string, qrSeconds = DEFAULT_QR_SECONDS): Promise<SessionQrToken> {
+    const uid = this.auth.currentUser()?.uid;
+    if (!uid) throw { code: 'functions/unauthenticated' };
+    // Al rotar, revoca los tokens activos previos (higiene: no dejar tokens ACTIVE vencidos).
+    await this.revokeActiveTokens(sessionId);
     const token = randomCode(10);
     const tokenHash = await sha256Hex(token);
     const expiresAt = Date.now() + qrSeconds * 1000;
@@ -129,11 +135,28 @@ export class SessionService {
         tokenHash,
         status: 'ACTIVE',
         expiresAt: Timestamp.fromMillis(expiresAt),
-        createdBy: this.auth.currentUser()?.uid ?? null,
+        createdBy: uid,
         createdAt: serverTimestamp(),
       }),
     );
     return { token, expiresAt };
+  }
+
+  /** Revoca (status REVOKED) los tokens ACTIVE de una sesión. Las reglas solo permiten este cambio. */
+  async revokeActiveTokens(sessionId: string): Promise<void> {
+    const snap = await this.run(() =>
+      getDocs(
+        query(
+          collection(this.firestore, 'sessionTokens'),
+          where('sessionId', '==', sessionId),
+          where('status', '==', 'ACTIVE'),
+        ),
+      ),
+    );
+    if (snap.empty) return;
+    const batch = this.run(() => writeBatch(this.firestore));
+    snap.forEach((d) => batch.update(d.ref, { status: 'REVOKED' }));
+    await batch.commit();
   }
 
   /**

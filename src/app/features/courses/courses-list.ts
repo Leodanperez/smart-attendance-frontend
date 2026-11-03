@@ -36,7 +36,7 @@ import { ToastService } from '../../shared/toast/toast.service';
       <div class="flex gap-2">
         <button type="button" class="btn btn-secondary" (click)="exportCsv()">Exportar CSV</button>
         @if (isAdmin()) {
-          <a routerLink="/courses/new" class="btn btn-primary">Crear curso</a>
+          <a routerLink="/courses/new" class="btn btn-primary">Crear sección</a>
         }
       </div>
     </div>
@@ -98,6 +98,7 @@ import { ToastService } from '../../shared/toast/toast.service';
             <th scope="col">Carrera</th>
             <th scope="col">Ciclo</th>
             <th scope="col">Sección</th>
+            <th scope="col">Aula</th>
             <th scope="col">Docentes asignados</th>
             @if (!isStudent()) {
               <th scope="col">N° estudiantes</th>
@@ -115,6 +116,7 @@ import { ToastService } from '../../shared/toast/toast.service';
               <td>{{ c.careerName || 'Sin carrera' }}</td>
               <td class="whitespace-nowrap">{{ semesterLabel(c.semester) }}</td>
               <td>{{ c.section || '—' }}</td>
+              <td>{{ c.room || '—' }}</td>
               <td>{{ teacherNames(c) }}</td>
               @if (!isStudent()) {
                 <td>{{ studentCount().get(c.id) ?? 0 }}</td>
@@ -136,7 +138,7 @@ import { ToastService } from '../../shared/toast/toast.service';
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="10" class="text-center text-on-surface-variant">No hay cursos con estos filtros.</td></tr>
+            <tr><td colspan="11" class="text-center text-on-surface-variant">No hay cursos con estos filtros.</td></tr>
           }
         </tbody>
       </table>
@@ -232,7 +234,7 @@ export class CoursesList {
       if (this.careerId() && c.careerId !== this.careerId()) return false;
       if (this.semester() && String(c.semester) !== this.semester()) return false;
       if (!term) return true;
-      return [c.courseCode, c.name, c.section, c.careerName].some((v) => v?.toLowerCase().includes(term));
+      return [c.courseCode, c.name, c.section, c.room, c.careerName].some((v) => v?.toLowerCase().includes(term));
     });
   });
 
@@ -270,7 +272,7 @@ export class CoursesList {
   exportCsv(): void {
     downloadCsv(
       `cursos-${fileDate()}`,
-      ['Código', 'Nombre', 'Periodo', 'Carrera', 'Ciclo', 'Sección', 'Docentes', 'Estudiantes', 'Estado'],
+      ['Código', 'Nombre', 'Periodo', 'Carrera', 'Ciclo', 'Sección', 'Aula', 'Docentes', 'Estudiantes', 'Estado'],
       this.filtered().map((c) => [
         c.courseCode,
         c.name,
@@ -278,6 +280,7 @@ export class CoursesList {
         c.careerName,
         c.semester,
         c.section,
+        c.room,
         this.teacherNames(c),
         this.studentCount().get(c.id) ?? 0,
         this.statusLabels[c.status],
