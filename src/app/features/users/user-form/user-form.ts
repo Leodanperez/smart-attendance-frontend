@@ -3,8 +3,10 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { FieldTree, FormField, TreeValidationResult, form, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
@@ -39,9 +41,14 @@ import { errorMessage } from '../../../core/services/error-message';
 import { UserService } from '../../../core/services/user.service';
 import { FieldError, showInvalid } from '../../../shared/components/field-error';
 import { Icon } from '../../../shared/components/icon';
-import { PasswordToggle } from '../../../shared/components/password-toggle';
 import { ToastService } from '../../../shared/toast/toast.service';
-import { UserFormModel, initialUserForm, toCreateUserInput } from './user-form.model';
+import {
+  UserFormModel,
+  generatedEmail,
+  generatedPassword,
+  initialUserForm,
+  toCreateUserInput,
+} from './user-form.model';
 import { userFormSchema } from './user-form.schema';
 
 /**
@@ -52,7 +59,7 @@ import { userFormSchema } from './user-form.schema';
  */
 @Component({
   selector: 'app-user-form',
-  imports: [FormField, RouterLink, FieldError, Icon, PasswordToggle],
+  imports: [FormField, RouterLink, FieldError, Icon],
   templateUrl: './user-form.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -99,7 +106,36 @@ export class UserForm {
 
   protected readonly submitAttempted = signal(false);
 
+  constructor() {
+    // Correo y contraseña inicial se generan del documento (solo lectura en la UI):
+    //   correo     = documento@sidem.edu.pe     (ej. 76957680@sidem.edu.pe)
+    //   contraseña = sidem + documento          (ej. sidem76957680)
+    effect(() => {
+      const doc = this.userForm.personal.documentNumber().value();
+      const email = generatedEmail(doc);
+      const password = generatedPassword(doc);
+      untracked(() =>
+        this.model.update((m) => ({
+          ...m,
+          contact: { ...m.contact, email },
+          account: { ...m.account, password },
+        })),
+      );
+    });
+  }
+
   // Estado derivado
+  /** Correo generado (vista previa de solo lectura). */
+  protected readonly emailPreview = computed(
+    () => this.userForm.contact.email().value() || 'Se genera con el número de documento',
+  );
+  /** Contraseña inicial generada (vista previa de solo lectura). */
+  protected readonly passwordPreview = computed(
+    () => this.userForm.account.password().value() || 'Se genera con el número de documento',
+  );
+  /** Primer error del correo generado (p. ej. ya existe un usuario con ese correo). */
+  protected readonly emailError = computed(() => this.userForm.contact.email().errors()[0]?.message ?? null);
+
   protected readonly isDni = computed(() => this.userForm.personal.documentType().value() === 'DNI');
   /** Vista previa del código que se generará: STU-/TEA-/ADM- + número de documento. */
   protected readonly codePreview = computed(() => {

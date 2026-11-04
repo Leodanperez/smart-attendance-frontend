@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { CircleCheck, Download, Eye, Power, Search, UserPlus, Users } from 'lucide-angular';
+import { CircleCheck, Download, Eye, Power, Search, Upload, UserPlus, Users } from 'lucide-angular';
 import { catchError, of } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
@@ -25,6 +25,7 @@ import { DialogService } from '../../shared/dialogs/dialog.service';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 import { ToastService } from '../../shared/toast/toast.service';
 import { downloadCsv, fileDate } from '../../shared/utils/csv';
+import { UsersImportDialog, UsersImportDialogData } from './import/users-import-dialog';
 
 /** W03 — Gestión de usuarios. */
 @Component({
@@ -38,9 +39,12 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
           <h1 class="page-title">Usuarios</h1>
           <p class="page-subtitle">{{ filtered().length }} de {{ users().length }} usuarios registrados</p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3">
           <button type="button" class="btn btn-secondary" (click)="exportCsv()">
             <app-icon [name]="icons.download" /> Exportar CSV
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="openImport()">
+            <app-icon [name]="icons.upload" /> Importar Excel
           </button>
           <a routerLink="/users/new" class="btn btn-primary">
             <app-icon [name]="icons.add" /> Registrar usuario
@@ -122,17 +126,17 @@ import { downloadCsv, fileDate } from '../../shared/utils/csv';
                 <td class="whitespace-nowrap text-on-surface-variant">{{ u.createdAt | tsDate | date: 'dd/MM/yyyy' }}</td>
                 <td>
                   <div class="flex justify-end gap-1">
-                    <a [routerLink]="['/users', u.uid]" class="btn-icon hover:!text-primary" [attr.aria-label]="'Ver detalle de ' + name(u)" title="Ver detalle">
+                    <a [routerLink]="['/users', u.uid]" class="btn-icon hover:text-primary!" [attr.aria-label]="'Ver detalle de ' + name(u)" title="Ver detalle">
                       <app-icon [name]="icons.view" />
                     </a>
                     @if (u.uid !== me()?.uid) {
                       @if (u.status === 'ACTIVE') {
-                        <button type="button" class="btn-icon hover:!text-status-danger" [disabled]="busy()"
+                        <button type="button" class="btn-icon hover:text-status-danger!" [disabled]="busy()"
                           (click)="changeStatus(u, 'DISABLED')" [attr.aria-label]="'Desactivar a ' + name(u)" title="Desactivar">
                           <app-icon [name]="icons.power" />
                         </button>
                       } @else {
-                        <button type="button" class="btn-icon hover:!text-status-active" [disabled]="busy()"
+                        <button type="button" class="btn-icon hover:text-status-active!" [disabled]="busy()"
                           (click)="changeStatus(u, 'ACTIVE')"
                           [attr.aria-label]="(u.status === 'PENDING' ? 'Validar a ' : 'Activar a ') + name(u)"
                           [title]="u.status === 'PENDING' ? 'Validar' : 'Activar'">
@@ -206,6 +210,7 @@ export class UsersList {
   protected readonly icons = {
     add: UserPlus,
     download: Download,
+    upload: Upload,
     search: Search,
     view: Eye,
     power: Power,
@@ -272,6 +277,23 @@ export class UsersList {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Importar usuarios desde Excel/CSV. La lista se actualiza sola (suscripción en tiempo real). */
+  async openImport(): Promise<void> {
+    await this.dialogs.open<boolean, UsersImportDialogData>(
+      UsersImportDialog,
+      {
+        // Duplicados contra los usuarios ya registrados, para avisar antes de intentar crearlos.
+        isTaken: (field, value) => {
+          const target = value.trim().toLowerCase();
+          return this.users().some((u) =>
+            field === 'documentNumber' ? (u.documentNumber ?? '').toLowerCase() === target : (u.email ?? '').toLowerCase() === target,
+          );
+        },
+      },
+      'import-title',
+    );
   }
 
   exportCsv(): void {

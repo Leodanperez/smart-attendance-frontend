@@ -59,22 +59,37 @@ export class EnrollmentService {
 
   /** Inscripción manual por ADMIN (ID determinístico courseId_studentId evita duplicados). */
   async enroll(courseId: string, studentId: string): Promise<void> {
-    const id = enrollmentId(courseId, studentId);
-    const batch = this.run(() => writeBatch(this.firestore));
-    batch.set(this.run(() => doc(this.firestore, 'enrollments', id)), {
-      courseId,
-      studentId,
-      status: 'ACTIVE',
-      enrolledAt: serverTimestamp(),
-      enrolledBy: this.auth.currentUser()?.uid ?? null,
-    });
-    this.audit.addToBatch(batch, {
-      action: 'ENROLLMENT_CREATED',
-      entityType: 'ENROLLMENT',
-      entityId: id,
-      details: { courseId, studentId },
-    });
-    await batch.commit();
+    await this.enrollMany(courseId, [studentId]);
+  }
+
+  /**
+   * Inscribe a varios estudiantes en un curso. Escribe en lotes de 100 (cada inscripción + su
+   * auditoría = 2 escrituras, por debajo del límite de 500 por batch).
+   */
+  async enrollMany(courseId: string, studentIds: readonly string[]): Promise<void> {
+    const ids = [...new Set(studentIds)];
+    const enrolledBy = this.auth.currentUser()?.uid ?? null;
+    const CHUNK = 100;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const batch = this.run(() => writeBatch(this.firestore));
+      for (const studentId of ids.slice(i, i + CHUNK)) {
+        const id = enrollmentId(courseId, studentId);
+        batch.set(this.run(() => doc(this.firestore, 'enrollments', id)), {
+          courseId,
+          studentId,
+          status: 'ACTIVE',
+          enrolledAt: serverTimestamp(),
+          enrolledBy,
+        });
+        this.audit.addToBatch(batch, {
+          action: 'ENROLLMENT_CREATED',
+          entityType: 'ENROLLMENT',
+          entityId: id,
+          details: { courseId, studentId },
+        });
+      }
+      await batch.commit();
+    }
   }
 
   async drop(enrollment: Enrollment, reason: string): Promise<void> {

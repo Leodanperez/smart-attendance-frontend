@@ -106,14 +106,20 @@
       </div>
       <div class="grid gap-5 p-6 sm:grid-cols-2">
         <div>
-          <label for="email" class="label">Correo *</label>
+          <label for="email" class="label">Correo institucional</label>
           <div class="relative">
-            <app-icon [name]="icons.mail" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
-            <input id="email" type="email" [formField]="userForm.contact.email" autocomplete="off" class="input pl-11"
-              placeholder="usuario@institucion.edu.pe"
-              [attr.aria-invalid]="invalid(userForm.contact.email)" aria-describedby="email-msg" />
+            <app-icon [name]="icons.mail" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-primary" />
+            <output id="email" aria-describedby="email-msg" aria-live="polite"
+              class="input block truncate bg-primary-fixed/50 pl-11 font-mono font-semibold text-primary"
+              [class.ring-2]="emailError()" [class.ring-status-danger]="emailError()">
+              {{ emailPreview() }}
+            </output>
           </div>
-          <app-field-error [field]="userForm.contact.email" id="email-msg" />
+          @if (emailError(); as msg) {
+            <p id="email-msg" class="error" role="alert">{{ msg }}</p>
+          } @else {
+            <p id="email-msg" class="hint">Se genera automáticamente: número de documento + &#64;sidem.edu.pe.</p>
+          }
         </div>
 
         <div>
@@ -189,28 +195,15 @@
         </div>
 
         <div>
-          <label for="password" class="label">Contraseña *</label>
+          <label for="password" class="label">Contraseña inicial</label>
           <div class="relative">
-            <app-icon [name]="icons.lock" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
-            <input #pwd id="password" type="password" [formField]="userForm.account.password" autocomplete="new-password"
-              class="input pr-11 pl-11" placeholder="••••••••"
-              [attr.aria-invalid]="invalid(userForm.account.password)" aria-describedby="password-msg" />
-            <app-password-toggle [target]="pwd" />
+            <app-icon [name]="icons.lock" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-primary" />
+            <output id="password" aria-describedby="password-msg" aria-live="polite"
+              class="input block truncate bg-primary-fixed/50 pl-11 font-mono font-semibold text-primary">
+              {{ passwordPreview() }}
+            </output>
           </div>
-          <app-field-error [field]="userForm.account.password" id="password-msg"
-            hint="Mínimo 8 caracteres, con letras y números." />
-        </div>
-
-        <div>
-          <label for="confirmPassword" class="label">Confirmar contraseña *</label>
-          <div class="relative">
-            <app-icon [name]="icons.lock" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
-            <input #confirmPwd id="confirmPassword" type="password" [formField]="userForm.account.confirmPassword"
-              autocomplete="new-password" class="input pr-11 pl-11" placeholder="••••••••"
-              [attr.aria-invalid]="invalid(userForm.account.confirmPassword)" aria-describedby="confirm-msg" />
-            <app-password-toggle [target]="confirmPwd" />
-          </div>
-          <app-field-error [field]="userForm.account.confirmPassword" id="confirm-msg" />
+          <p id="password-msg" class="hint">Se genera automáticamente: sidem + número de documento.</p>
         </div>
       </div>
     </fieldset>

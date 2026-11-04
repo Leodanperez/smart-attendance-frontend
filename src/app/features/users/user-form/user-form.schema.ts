@@ -119,13 +119,5 @@ export function userFormSchema(isTaken: UniqueChecker) {
     required(account.password, { message: 'Ingresa una contraseña.' });
     minLength(account.password, 8, { message: 'Mínimo 8 caracteres.' });
     optionalPattern(account.password, PASSWORD_PATTERN, 'Debe incluir letras y números.');
-
-    required(account.confirmPassword, { message: 'Confirma la contraseña.' });
-    // Validación cruzada entre campos.
-    validate(account.confirmPassword, ({ value, valueOf }) =>
-      value() && value() !== valueOf(account.password)
-        ? { kind: 'passwordMismatch', message: 'Las contraseñas no coinciden.' }
-        : null,
-    );
   });
 }

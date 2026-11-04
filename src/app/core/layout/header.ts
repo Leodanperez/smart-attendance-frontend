@@ -34,6 +34,10 @@ function deepestTitle(route: ActivatedRoute): string {
   selector: 'app-header',
   imports: [RouterLink, Icon, CdkMenuTrigger, CdkMenu, CdkMenuItem],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // `contents`: el host no genera caja propia, así el <header class="sticky"> queda como hijo directo de la
+  // columna del layout y se mantiene fijo mientras se desplaza el contenido (un host con la altura del
+  // header no le dejaría recorrido a sticky).
+  host: { class: 'contents' },
   template: `
     <header class="sticky top-0 z-20 flex h-16 items-center gap-3 bg-surface-container/90 px-4 shadow-card backdrop-blur md:px-6">
       <!-- Hamburguesa móvil: abre el drawer -->
@@ -96,7 +100,7 @@ function deepestTitle(route: ActivatedRoute): string {
                 }
               </div>
               <div class="border-t border-outline-variant/40 py-1">
-                <button cdkMenuItem type="button" class="menu-item !text-status-danger" (cdkMenuItemTriggered)="logout()">
+                <button cdkMenuItem type="button" class="menu-item text-status-danger!" (cdkMenuItemTriggered)="logout()">
                   <app-icon [name]="icons.logout" [size]="16" /> Cerrar sesión
                 </button>
               </div>

@@ -31,8 +31,10 @@ function toLocalInput(date: Date): string {
   selector: 'app-sessions',
   imports: [ReactiveFormsModule, RouterLink, DatePipe, TsDatePipe],
   template: `
-    <h1 class="page-title">Sesiones</h1>
-    <p class="page-subtitle">Crea sesiones para tus cursos, muestra el QR y ciérralas al terminar.</p>
+    <header>
+      <h1 class="page-title">Sesiones</h1>
+      <p class="page-subtitle">Crea sesiones para tus cursos, muestra el QR y ciérralas al terminar.</p>
+    </header>
 
     @if (error() || scope.error()) {
       <p role="alert" class="alert-error mt-4">{{ error() || scope.error() }}</p>
@@ -41,11 +43,16 @@ function toLocalInput(date: Date): string {
       <p role="status" class="alert-success mt-4">{{ message() }}</p>
     }
 
-    <div class="mt-6 grid gap-4 lg:grid-cols-3">
+    <div class="mt-8 grid items-start gap-6 lg:grid-cols-[22rem_1fr]">
       <!-- Crear sesión -->
-      <section class="card" aria-labelledby="create-title">
-        <h2 id="create-title" class="font-medium text-on-surface">Crear sesión</h2>
-        <form [formGroup]="form" (ngSubmit)="create()" novalidate class="mt-3 space-y-3">
+      <section
+        class="rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm lg:sticky lg:top-4"
+        aria-labelledby="create-title"
+      >
+        <h2 id="create-title" class="text-base font-semibold tracking-tight text-on-surface">Crear sesión</h2>
+        <p class="mt-1 text-sm text-on-surface-variant">Al crearla pasarás directo al QR en vivo.</p>
+
+        <form [formGroup]="form" (ngSubmit)="create()" novalidate class="mt-5 space-y-4">
           <div>
             <label for="courseId" class="label">Curso asignado *</label>
             <select id="courseId" formControlName="courseId" class="input" [attr.aria-invalid]="invalid('courseId')">
@@ -65,7 +72,7 @@ function toLocalInput(date: Date): string {
             <input id="startsAt" type="datetime-local" formControlName="startsAt" class="input"
               [attr.aria-invalid]="invalid('startsAt')" />
           </div>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-3">
             <div>
               <label for="duration" class="label">Duración (min) *</label>
               <input id="duration" type="number" min="5" max="600" formControlName="durationMinutes" class="input"
@@ -77,21 +84,31 @@ function toLocalInput(date: Date): string {
                 aria-describedby="late-help" [attr.aria-invalid]="invalid('lateAfterMinutes')" />
             </div>
           </div>
-          <p id="late-help" class="text-xs text-on-surface-variant">Vacío = sin control de tardanza.</p>
+          <p id="late-help" class="-mt-2 text-xs text-on-surface-variant">Vacío = sin control de tardanza.</p>
+
           @if (endPreview(); as end) {
-            <p class="rounded-md bg-surface-container-low px-3 py-2 text-sm text-on-surface">
-              Fin de la sesión: <strong>{{ end | date: 'dd/MM/yyyy HH:mm' }}</strong>
-              <span class="block text-xs text-on-surface-variant">Al llegar esta hora ciérrala para marcar faltas a quienes no registraron.</span>
-            </p>
+            <div class="flex items-start gap-3 rounded-2xl bg-primary-fixed p-3">
+              <span aria-hidden="true" class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                </svg>
+              </span>
+              <p class="text-sm text-on-surface">
+                Fin de la sesión: <strong class="font-semibold">{{ end | date: 'dd/MM/yyyy HH:mm' }}</strong>
+                <span class="mt-0.5 block text-xs text-on-surface-variant">Al llegar esta hora ciérrala para marcar faltas a quienes no registraron.</span>
+              </p>
+            </div>
           }
+
           <button type="submit" class="btn btn-primary w-full" [disabled]="busy()">Crear sesión</button>
         </form>
       </section>
 
       <!-- Lista -->
-      <section class="lg:col-span-2" aria-labelledby="list-title">
+      <section aria-labelledby="list-title">
         <h2 id="list-title" class="sr-only">Sesiones</h2>
-        <div class="card grid gap-3 sm:grid-cols-2">
+
+        <div class="grid gap-4 rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:grid-cols-2">
           <div>
             <label for="f-course" class="label">Curso</label>
             <select id="f-course" class="input" #fc (change)="filterCourse.set(fc.value)">
@@ -112,13 +129,16 @@ function toLocalInput(date: Date): string {
           </div>
         </div>
 
+        <p class="mt-4 px-1 text-sm text-on-surface-variant">
+          {{ filtered().length }} sesión(es)
+        </p>
+
         <!-- Tabla (escritorio) -->
-        <div class="table-wrap mt-4 hidden md:block">
+        <div class="table-wrap mt-2 hidden overflow-hidden rounded-3xl border border-outline-variant/60 shadow-sm md:block">
           <table class="table">
             <thead>
               <tr>
-                <th scope="col">Curso</th>
-                <th scope="col">Tema</th>
+                <th scope="col">Sesión</th>
                 <th scope="col">Inicio</th>
                 <th scope="col">Fin</th>
                 <th scope="col">Estado</th>
@@ -128,19 +148,30 @@ function toLocalInput(date: Date): string {
             <tbody>
               @for (s of filtered(); track s.id) {
                 <tr>
-                  <td>{{ courseName(s.courseId) }}</td>
-                  <td class="font-medium text-on-surface">{{ s.title }}</td>
+                  <td>
+                    <p class="font-medium text-on-surface">{{ s.title }}</p>
+                    <p class="text-xs text-on-surface-variant">{{ courseName(s.courseId) }}</p>
+                  </td>
                   <td class="whitespace-nowrap">{{ s.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</td>
                   <td class="whitespace-nowrap">{{ s.expiresAt | tsDate | date: 'HH:mm' }}</td>
                   <td>
-                    <span [class]="statusBadge[s.status]">{{ statusLabels[s.status] }}</span>
-                    @if (isExpired(s)) {
-                      <span class="badge badge-yellow ml-1">Hora vencida</span>
-                    }
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      @if (s.status === 'ACTIVE') {
+                        <span aria-hidden="true" class="relative flex size-2">
+                          <span class="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:animate-none"></span>
+                          <span class="relative inline-flex size-2 rounded-full bg-primary"></span>
+                        </span>
+                      }
+                      <span [class]="statusBadge[s.status]">{{ statusLabels[s.status] }}</span>
+                      @if (isExpired(s)) {
+                        <span class="badge badge-yellow">Hora vencida</span>
+                      }
+                    </div>
                   </td>
                   <td>
                     <div class="flex justify-end gap-2">
-                      <a routerLink="/live-attendance" [queryParams]="{ sessionId: s.id }" class="btn btn-secondary btn-sm">
+                      <a routerLink="/live-attendance" [queryParams]="{ sessionId: s.id }"
+                        [class]="s.status === 'ACTIVE' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'">
                         {{ s.status === 'ACTIVE' ? 'QR / En vivo' : 'Ver asistencia' }}
                       </a>
                       @if (s.status === 'ACTIVE') {
@@ -150,33 +181,45 @@ function toLocalInput(date: Date): string {
                   </td>
                 </tr>
               } @empty {
-                <tr><td colspan="6" class="text-center text-on-surface-variant">Sin sesiones.</td></tr>
+                <tr><td colspan="5" class="py-12 text-center text-on-surface-variant">No hay sesiones con ese filtro.</td></tr>
               }
             </tbody>
           </table>
         </div>
 
         <!-- Tarjetas (móvil) -->
-        <ul class="mt-4 space-y-3 md:hidden">
+        <ul class="mt-2 space-y-3 md:hidden">
           @for (s of filtered(); track s.id) {
-            <li class="card p-4">
+            <li class="rounded-2xl border border-outline-variant/60 bg-surface-container p-4 shadow-sm">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <p class="truncate font-medium text-on-surface">{{ s.title }}</p>
                   <p class="truncate text-xs text-on-surface-variant">{{ courseName(s.courseId) }}</p>
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-1">
-                  <span [class]="statusBadge[s.status]">{{ statusLabels[s.status] }}</span>
+                  <span class="inline-flex items-center gap-1.5">
+                    @if (s.status === 'ACTIVE') {
+                      <span aria-hidden="true" class="relative flex size-2">
+                        <span class="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:animate-none"></span>
+                        <span class="relative inline-flex size-2 rounded-full bg-primary"></span>
+                      </span>
+                    }
+                    <span [class]="statusBadge[s.status]">{{ statusLabels[s.status] }}</span>
+                  </span>
                   @if (isExpired(s)) {
                     <span class="badge badge-yellow">Hora vencida</span>
                   }
                 </div>
               </div>
-              <p class="mt-2 text-xs text-on-surface-variant">
+              <p class="mt-3 flex items-center gap-1.5 text-xs text-on-surface-variant">
+                <svg aria-hidden="true" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                </svg>
                 {{ s.startsAt | tsDate | date: 'dd/MM/yyyy HH:mm' }} – {{ s.expiresAt | tsDate | date: 'HH:mm' }}
               </p>
               <div class="mt-3 flex flex-wrap justify-end gap-2 border-t border-outline-variant/50 pt-3">
-                <a routerLink="/live-attendance" [queryParams]="{ sessionId: s.id }" class="btn btn-secondary btn-sm">
+                <a routerLink="/live-attendance" [queryParams]="{ sessionId: s.id }"
+                  [class]="s.status === 'ACTIVE' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'">
                   {{ s.status === 'ACTIVE' ? 'QR / En vivo' : 'Ver asistencia' }}
                 </a>
                 @if (s.status === 'ACTIVE') {
@@ -185,7 +228,9 @@ function toLocalInput(date: Date): string {
               </div>
             </li>
           } @empty {
-            <li class="card text-center text-sm text-on-surface-variant">Sin sesiones.</li>
+            <li class="rounded-2xl border border-dashed border-outline-variant px-4 py-10 text-center text-sm text-on-surface-variant">
+              No hay sesiones con ese filtro.
+            </li>
           }
         </ul>
       </section>

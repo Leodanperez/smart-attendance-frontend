@@ -55,25 +55,34 @@ interface Related {
   selector: 'app-user-detail',
   imports: [RouterLink, DatePipe, TsDatePipe, ReactiveFormsModule],
   template: `
-    <a routerLink="/users" class="text-sm text-primary hover:underline">← Volver a usuarios</a>
+    <a routerLink="/users" class="inline-flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-sm font-medium text-primary transition-colors hover:bg-primary-fixed">
+      <svg aria-hidden="true" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m0 0 6-6m-6 6 6 6" /></svg>
+      Volver a usuarios
+    </a>
 
     @if (user() === undefined) {
-      <p class="mt-4 text-sm text-on-surface-variant">Cargando…</p>
+      <p class="mt-6 text-sm text-on-surface-variant">Cargando…</p>
     } @else if (user() === null) {
-      <p class="alert-error mt-4">El usuario no existe.</p>
+      <p class="alert-error mt-6">El usuario no existe.</p>
     } @else {
       @let u = user()!;
-      <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
+
+      <!-- Cabecera -->
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:p-6">
+        <div class="flex min-w-0 items-center gap-4">
           @if (u.photoUrl) {
-            <img [src]="u.photoUrl" alt="" class="h-14 w-14 rounded-full object-cover" />
+            <img [src]="u.photoUrl" alt="" class="size-16 shrink-0 rounded-2xl object-cover ring-2 ring-primary/15" />
+          } @else {
+            <span aria-hidden="true" class="grid size-16 shrink-0 place-items-center rounded-2xl bg-primary text-2xl font-semibold text-surface-container">
+              {{ name(u).charAt(0).toUpperCase() }}
+            </span>
           }
-          <div>
-            <h1 class="page-title">{{ name(u) }}</h1>
-            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+          <div class="min-w-0">
+            <h1 class="page-title truncate">{{ name(u) }}</h1>
+            <p class="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
               <span class="badge badge-blue">{{ roleLabels[u.role] }}</span>
               <span [class]="statusBadge[u.status]">{{ statusLabels[u.status] }}</span>
-              <span>{{ u.email }}</span>
+              <span class="truncate">{{ u.email }}</span>
             </p>
           </div>
         </div>
@@ -100,29 +109,56 @@ interface Related {
         <p role="status" class="alert-success mt-4">{{ message() }}</p>
       }
 
-      <div class="mt-6 grid gap-4 lg:grid-cols-3">
+      <div class="mt-6 grid items-start gap-6 lg:grid-cols-3">
         <!-- Perfil -->
-        <section class="card lg:col-span-2" aria-labelledby="profile-title">
-          <div class="flex items-center justify-between">
-            <h2 id="profile-title" class="font-medium text-on-surface">Datos de perfil</h2>
+        <section class="rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:p-6 lg:col-span-2" aria-labelledby="profile-title">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="profile-title" class="text-base font-semibold tracking-tight text-on-surface">Datos de perfil</h2>
             @if (!editing()) {
-              <button type="button" class="btn btn-secondary btn-sm" (click)="startEdit(u)">Editar datos institucionales</button>
+              <button type="button" class="btn btn-secondary btn-sm inline-flex items-center gap-1.5" (click)="startEdit(u)">
+                <svg aria-hidden="true" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                Editar datos institucionales
+              </button>
             }
           </div>
 
           @if (!editing()) {
-            <dl class="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div><dt class="text-on-surface-variant">Código institucional</dt><dd class="font-medium">{{ u.institutionalCode || '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Documento</dt><dd class="font-medium">{{ u.documentType ? docLabels[u.documentType] : '' }} {{ u.documentNumber || '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Fecha de nacimiento</dt><dd class="font-medium">{{ u.birthDate || '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Sexo</dt><dd class="font-medium">{{ u.gender ? genderLabels[u.gender] : '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Celular</dt><dd class="font-medium">{{ u.phone || '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Dirección</dt><dd class="font-medium">{{ u.address || '—' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Fecha de registro</dt><dd class="font-medium">{{ u.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
-              <div><dt class="text-on-surface-variant">Última actualización</dt><dd class="font-medium">{{ u.updatedAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+            <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Código institucional</dt>
+                <dd class="mt-1 font-mono font-semibold text-on-surface">{{ u.institutionalCode || '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Documento</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.documentType ? docLabels[u.documentType] : '' }} {{ u.documentNumber || '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Fecha de nacimiento</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.birthDate || '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Sexo</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.gender ? genderLabels[u.gender] : '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Celular</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.phone || '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Dirección</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.address || '—' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Fecha de registro</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd>
+              </div>
+              <div class="rounded-2xl bg-surface-container-high/40 px-4 py-3">
+                <dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Última actualización</dt>
+                <dd class="mt-1 font-medium text-on-surface">{{ u.updatedAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</dd>
+              </div>
             </dl>
           } @else {
-            <form [formGroup]="form" (ngSubmit)="save(u)" novalidate class="mt-4 grid gap-4 sm:grid-cols-2">
+            <form [formGroup]="form" (ngSubmit)="save(u)" novalidate class="mt-5 grid gap-4 sm:grid-cols-2">
               <div>
                 <label for="d-firstName" class="label">Nombres *</label>
                 <input id="d-firstName" formControlName="firstName" class="input" [attr.aria-invalid]="invalid('firstName')" />
@@ -173,7 +209,7 @@ interface Related {
                 <label for="d-address" class="label">Dirección</label>
                 <input id="d-address" formControlName="address" class="input" />
               </div>
-              <div class="flex justify-end gap-2 sm:col-span-2">
+              <div class="flex justify-end gap-2 border-t border-outline-variant/50 pt-4 sm:col-span-2">
                 <button type="button" class="btn btn-secondary" (click)="editing.set(false)">Cancelar</button>
                 <button type="submit" class="btn btn-primary" [disabled]="busy()">Guardar cambios</button>
               </div>
@@ -182,8 +218,8 @@ interface Related {
         </section>
 
         <!-- Rol y soporte -->
-        <section class="card space-y-4" aria-labelledby="role-title">
-          <h2 id="role-title" class="font-medium text-on-surface">Rol y estado</h2>
+        <section class="space-y-5 rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:p-6" aria-labelledby="role-title">
+          <h2 id="role-title" class="text-base font-semibold tracking-tight text-on-surface">Rol y estado</h2>
           @if (isSelf()) {
             <p class="alert-info">No puedes modificar tu propio rol ni estado.</p>
           } @else {
@@ -201,62 +237,66 @@ interface Related {
               </div>
             </div>
           }
-          <details class="text-sm">
-            <summary class="cursor-pointer text-on-surface">Datos de soporte</summary>
-            <dl class="mt-2 space-y-2">
-              <div><dt class="text-on-surface-variant">UID</dt><dd class="font-mono text-xs break-all">{{ u.uid }}</dd></div>
-              <div><dt class="text-on-surface-variant">Proveedor de autenticación</dt><dd>{{ providerLabels[u.authProvider] || u.authProvider }}</dd></div>
+          <details class="group rounded-2xl border border-outline-variant/50 bg-surface-container-high/40 text-sm">
+            <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-medium text-on-surface">
+              Datos de soporte
+              <svg aria-hidden="true" class="size-4 text-on-surface-variant transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </summary>
+            <dl class="space-y-3 border-t border-outline-variant/50 px-4 py-3">
+              <div><dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">UID</dt><dd class="mt-1 font-mono text-xs break-all">{{ u.uid }}</dd></div>
+              <div><dt class="text-xs font-medium tracking-wide text-on-surface-variant uppercase">Proveedor de autenticación</dt><dd class="mt-1">{{ providerLabels[u.authProvider] || u.authProvider }}</dd></div>
             </dl>
           </details>
         </section>
       </div>
 
       <!-- Cursos e inscripciones -->
-      <section class="card mt-4" aria-labelledby="courses-title">
-        <h2 id="courses-title" class="font-medium text-on-surface">
+      <section class="mt-6 rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:p-6" aria-labelledby="courses-title">
+        <h2 id="courses-title" class="text-base font-semibold tracking-tight text-on-surface">
           {{ u.role === 'STUDENT' ? 'Inscripciones' : 'Cursos asignados' }}
         </h2>
-        <ul class="mt-3 divide-y divide-outline-variant/50">
+        <ul class="mt-4 space-y-2">
           @if (u.role === 'STUDENT') {
             @for (e of related().enrollments; track e.id) {
-              <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <a [routerLink]="['/courses', e.courseId]" class="text-primary hover:underline">{{ courseName(e.courseId) }}</a>
-                <span class="text-on-surface-variant">
+              <li class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-outline-variant/50 bg-surface-container-high/40 px-4 py-3 text-sm transition-colors hover:bg-surface-container-high">
+                <a [routerLink]="['/courses', e.courseId]" class="min-w-0 truncate font-medium text-primary hover:underline">{{ courseName(e.courseId) }}</a>
+                <span class="text-xs text-on-surface-variant">
                   {{ enrollmentLabels[e.status] }} · {{ e.enrolledAt | tsDate | date: 'dd/MM/yyyy' }}
                 </span>
               </li>
             } @empty {
-              <li class="py-2 text-sm text-on-surface-variant">Sin inscripciones.</li>
+              <li class="rounded-2xl border border-dashed border-outline-variant px-4 py-8 text-center text-sm text-on-surface-variant">Sin inscripciones.</li>
             }
           } @else {
             @for (c of related().courses; track c.id) {
-              <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <a [routerLink]="['/courses', c.id]" class="text-primary hover:underline">{{ label(c) }}</a>
+              <li class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-outline-variant/50 bg-surface-container-high/40 px-4 py-3 text-sm transition-colors hover:bg-surface-container-high">
+                <a [routerLink]="['/courses', c.id]" class="min-w-0 truncate font-medium text-primary hover:underline">{{ label(c) }}</a>
                 <span [class]="courseBadge[c.status]">{{ courseStatus[c.status] }}</span>
               </li>
             } @empty {
-              <li class="py-2 text-sm text-on-surface-variant">Sin cursos asociados.</li>
+              <li class="rounded-2xl border border-dashed border-outline-variant px-4 py-8 text-center text-sm text-on-surface-variant">Sin cursos asociados.</li>
             }
           }
         </ul>
       </section>
 
       <!-- Actividad -->
-      <section class="card mt-4" aria-labelledby="activity-title">
-        <h2 id="activity-title" class="font-medium text-on-surface">Historial de actividad</h2>
-        <ul class="mt-3 divide-y divide-outline-variant/50">
+      <section class="mt-6 rounded-3xl border border-outline-variant/60 bg-surface-container p-5 shadow-sm sm:p-6" aria-labelledby="activity-title">
+        <h2 id="activity-title" class="text-base font-semibold tracking-tight text-on-surface">Historial de actividad</h2>
+        <ul class="mt-5 ml-2 space-y-5 border-l border-outline-variant/60 pl-6">
           @for (log of activity(); track log.id) {
-            <li class="py-2 text-sm">
-              <div class="flex flex-wrap justify-between gap-2">
+            <li class="relative text-sm">
+              <span aria-hidden="true" class="absolute top-1.5 left-[-1.84rem] size-2.5 rounded-full bg-primary ring-4 ring-surface-container"></span>
+              <div class="flex flex-wrap justify-between gap-x-3 gap-y-0.5">
                 <span class="font-medium text-on-surface">{{ actionLabels[log.action] || log.action }}</span>
-                <span class="text-on-surface-variant">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
+                <span class="text-xs text-on-surface-variant">{{ log.createdAt | tsDate | date: 'dd/MM/yyyy HH:mm' }}</span>
               </div>
-              <p class="text-xs text-on-surface-variant">
+              <p class="mt-0.5 text-xs text-on-surface-variant">
                 Por {{ log.actorName || log.actorId }}@if (log.reason) { · Motivo: {{ log.reason }} }
               </p>
             </li>
           } @empty {
-            <li class="py-2 text-sm text-on-surface-variant">Sin actividad registrada.</li>
+            <li class="-ml-6 text-sm text-on-surface-variant">Sin actividad registrada.</li>
           }
         </ul>
       </section>
