@@ -9,13 +9,16 @@ import { courseLabel } from '../../core/models/course.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
 import { tsToDate, uniq } from '../../core/services/firestore.utils';
 import { ReportService, percentLabel } from '../../core/services/report.service';
+import { Chart, ChartPoint } from '../../shared/components/chart';
 import { StatCard } from '../../shared/components/stat-card';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
+
+const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short' });
 
 /** W08 — Dashboard docente. */
 @Component({
   selector: 'app-teacher-dashboard',
-  imports: [StatCard, RouterLink, DatePipe, TsDatePipe],
+  imports: [StatCard, Chart, RouterLink, DatePipe, TsDatePipe],
   template: `
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
@@ -36,6 +39,12 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
       @for (stat of stats(); track stat.label) {
         <app-stat-card [label]="stat.label" [value]="stat.value" [icon]="stat.icon" />
       }
+    </section>
+
+    <!-- Gráficos -->
+    <section class="mt-6 grid gap-4 lg:grid-cols-2" aria-label="Gráficos">
+      <app-chart kind="bar-horizontal" title="Asistencia por curso" [data]="byCourse()" [max]="100" unit="%" />
+      <app-chart kind="line" title="Asistencias por día" [data]="evolution()" />
     </section>
 
     <div class="mt-6 grid gap-4 lg:grid-cols-2">
@@ -111,6 +120,36 @@ export class TeacherDashboard {
   protected readonly activeSessions = computed(() =>
     this.sessions().filter((s) => s.status === 'ACTIVE'),
   );
+
+  /** Asistencia promedio por curso (barras). */
+  protected readonly byCourse = computed<ChartPoint[]>(() =>
+    this.reports()
+      .filter((r) => r.averagePercentage != null)
+      .map((r) => ({
+        label: courseLabel(r.course),
+        value: Math.round((r.averagePercentage ?? 0) * 10) / 10,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10),
+  );
+
+  /** Asistencias registradas (presente/tardanza) por día, últimos 14 días. */
+  protected readonly evolution = computed<ChartPoint[]>(() => {
+    const days = new Map<string, { date: Date; count: number }>();
+    for (const a of this.attendances()) {
+      if (a.status !== 'PRESENT' && a.status !== 'LATE') continue;
+      const date = tsToDate(a.registeredAt);
+      if (!date) continue;
+      const key = date.toISOString().slice(0, 10);
+      const entry = days.get(key) ?? { date, count: 0 };
+      entry.count++;
+      days.set(key, entry);
+    }
+    return [...days.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-14)
+      .map(([, d]) => ({ label: dayFormat.format(d.date), value: d.count }));
+  });
 
   protected readonly stats = computed(() => {
     const today = new Date().toDateString();

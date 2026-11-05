@@ -13,7 +13,7 @@ import { AuditService } from '../../core/services/audit.service';
 import { tsMillis, tsToDate, uniq } from '../../core/services/firestore.utils';
 import { DateRange, ReportService, percentLabel } from '../../core/services/report.service';
 import { UserService } from '../../core/services/user.service';
-import { BarChart, BarDatum } from '../../shared/components/bar-chart';
+import { Chart, ChartPoint } from '../../shared/components/chart';
 import { StatCard } from '../../shared/components/stat-card';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
 import { PeriodFilter } from '../../shared/utils/period-filter';
@@ -24,7 +24,7 @@ const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'sho
 /** W02 — Dashboard administrador. */
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [StatCard, BarChart, RouterLink, DatePipe, TsDatePipe],
+  imports: [StatCard, Chart, RouterLink, DatePipe, TsDatePipe],
   template: `
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
@@ -97,10 +97,11 @@ const dayFormat = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'sho
     </section>
 
     <!-- Gráficos -->
-    <section class="mt-6 grid gap-4 lg:grid-cols-3" aria-label="Gráficos">
-      <app-bar-chart title="Asistencia por periodo" [data]="byPeriod()" [max]="100" />
-      <app-bar-chart title="Asistencia por curso" [data]="byCourse()" [max]="100" />
-      <app-bar-chart title="Evolución de registros (por día)" [data]="evolution()" />
+    <section class="mt-6 grid gap-4 lg:grid-cols-2" aria-label="Gráficos">
+      <app-chart kind="area" title="Asistencia por periodo" [data]="byPeriod()" [max]="100" unit="%" />
+      <app-chart kind="line" title="Evolución de registros (por día)" [data]="evolution()" />
+      <app-chart kind="bar-horizontal" title="Asistencia por curso" [data]="byCourse()" [max]="100" unit="%" [height]="340" />
+      <app-chart kind="radialBar" title="Asistencia promedio" [data]="overallGauge()" unit="%" [height]="340" />
     </section>
 
     <!-- Actividad reciente -->
@@ -221,19 +222,25 @@ export class AdminDashboard {
     ];
   });
 
-  protected readonly byCourse = computed<BarDatum[]>(() =>
+  protected readonly byCourse = computed<ChartPoint[]>(() =>
     this.courseReports()
       .filter((r) => r.averagePercentage != null)
       .map((r) => ({
         label: `${r.course.courseCode} · ${r.course.name}`,
-        value: r.averagePercentage ?? 0,
-        display: percentLabel(r.averagePercentage),
+        value: Math.round((r.averagePercentage ?? 0) * 10) / 10,
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10),
   );
 
-  protected readonly byPeriod = computed<BarDatum[]>(() => {
+  /** Asistencia promedio global para el medidor radial. */
+  protected readonly overallGauge = computed<ChartPoint[]>(() => {
+    const overall = this.reports.overall(this.courseReports());
+    if (overall == null) return [];
+    return [{ label: 'Asistencia', value: Math.round(overall * 10) / 10 }];
+  });
+
+  protected readonly byPeriod = computed<ChartPoint[]>(() => {
     const months = new Map<string, { date: Date; attended: number; total: number }>();
     for (const report of this.courseReports()) {
       for (const s of report.sessions) {
@@ -252,11 +259,11 @@ export class AdminDashboard {
       .slice(-12)
       .map(([, m]) => {
         const value = m.total > 0 ? Math.round((m.attended / m.total) * 1000) / 10 : 0;
-        return { label: monthFormat.format(m.date), value, display: percentLabel(m.total ? value : null) };
+        return { label: monthFormat.format(m.date), value };
       });
   });
 
-  protected readonly evolution = computed<BarDatum[]>(() => {
+  protected readonly evolution = computed<ChartPoint[]>(() => {
     const ids = new Set(this.filteredCourses().map((c) => c.id));
     const range = this.range();
     const days = new Map<string, { date: Date; count: number }>();

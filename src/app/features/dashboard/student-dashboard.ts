@@ -12,12 +12,14 @@ import { courseLabel } from '../../core/models/course.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
 import { tsMillis } from '../../core/services/firestore.utils';
 import { ReportService, percentLabel } from '../../core/services/report.service';
+import { Chart, ChartPoint } from '../../shared/components/chart';
 import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
+import { ATTENDANCE_STATUSES } from '../../core/models/attendance.model';
 
 /** Vista de consulta para estudiantes (su experiencia principal es Android). */
 @Component({
   selector: 'app-student-dashboard',
-  imports: [RouterLink, DatePipe, TsDatePipe],
+  imports: [RouterLink, Chart, DatePipe, TsDatePipe],
   template: `
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
@@ -44,6 +46,12 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
       } @empty {
         <p class="text-sm text-on-surface-variant">Aún no estás inscrito en cursos.</p>
       }
+    </section>
+
+    <!-- Gráficos -->
+    <section class="mt-6 grid gap-4 lg:grid-cols-2" aria-label="Gráficos">
+      <app-chart kind="bar-horizontal" title="Mi asistencia por curso" [data]="byCourse()" [max]="100" unit="%" />
+      <app-chart kind="donut" title="Desglose de mi historial" [data]="statusBreakdown()" />
     </section>
 
     <section class="card mt-6" aria-labelledby="history-title">
@@ -89,6 +97,24 @@ export class StudentDashboard {
   protected readonly history = computed(() =>
     [...this.attendances()].sort((a, b) => tsMillis(b.registeredAt) - tsMillis(a.registeredAt)).slice(0, 15),
   );
+
+  /** Porcentaje de asistencia por curso (barras). */
+  protected readonly byCourse = computed<ChartPoint[]>(() =>
+    this.reports()
+      .map((r) => ({
+        label: courseLabel(r.course),
+        value: Math.round((r.students[0]?.percentage ?? 0) * 10) / 10,
+      }))
+      .sort((a, b) => b.value - a.value),
+  );
+
+  /** Desglose de todos mis registros por estado (dona). */
+  protected readonly statusBreakdown = computed<ChartPoint[]>(() => {
+    const counts = new Map<string, number>();
+    for (const a of this.attendances()) counts.set(a.status, (counts.get(a.status) ?? 0) + 1);
+    return ATTENDANCE_STATUSES.filter((s) => counts.get(s))
+      .map((s) => ({ label: this.statusLabels[s], value: counts.get(s) ?? 0 }));
+  });
 
   protected sessionTitle(id: string): string {
     return this.sessions().find((s) => s.id === id)?.title ?? 'Sesión';
