@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -112,6 +112,7 @@ import { PasswordToggle } from '../../shared/components/password-toggle';
 export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
   protected readonly theme = inject(ThemeService);
 
   protected readonly icons = {
@@ -141,6 +142,7 @@ export class Login {
     this.info.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.cdr.markForCheck();
       this.error.set('Ingresa un correo válido y tu contraseña.');
       return;
     }

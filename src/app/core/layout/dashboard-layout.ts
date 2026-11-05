@@ -39,7 +39,7 @@ import { Sidebar } from './sidebar';
 
       <div class="flex min-w-0 flex-1 flex-col">
         <app-header />
-        <main id="main" tabindex="-1" class="animate-fade-in mx-auto w-full max-w-[1400px] flex-1 p-4 outline-none md:p-6 lg:p-8">
+        <main id="main" tabindex="-1" class="animate-fade-in mx-auto w-full max-w-350 flex-1 p-4 outline-none md:p-6 lg:p-8">
           <router-outlet />
         </main>
         <app-footer />

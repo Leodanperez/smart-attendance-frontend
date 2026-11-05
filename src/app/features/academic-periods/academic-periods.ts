@@ -86,7 +86,7 @@ import { ToastService } from '../../shared/toast/toast.service';
                 <td>
                   <div class="flex justify-end gap-2">
                     @if (p.status !== 'CLOSED') {
-                      <button type="button" class="btn-icon hover:!text-primary" (click)="edit(p)"
+                      <button type="button" class="btn-icon hover:text-primary!" (click)="edit(p)"
                         [attr.aria-label]="'Editar fechas de ' + p.name" title="Editar fechas">
                         <app-icon [name]="icons.edit" />
                       </button>
