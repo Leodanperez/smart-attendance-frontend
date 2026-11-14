@@ -1,5 +1,7 @@
 import { Timestamp } from '@angular/fire/firestore';
 
+import { Shift } from './course.model';
+
 export const USER_ROLES = ['STUDENT', 'TEACHER', 'ADMIN'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
@@ -63,6 +65,15 @@ export interface UserProfile {
   gender?: Gender;
   phone?: string | null;
   address?: string | null;
+  /**
+   * Carrera, ciclo y turno del alumno (solo para role === 'STUDENT').
+   * Se asignan al crear/importar y se usan para pre-filtrar el picker de inscripción.
+   * null en registros previos a esta versión o en docentes/admins.
+   */
+  careerId?: string | null;
+  careerName?: string | null;
+  semester?: number | null;
+  shift?: Shift | null;
   createdBy?: string | null;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
@@ -81,6 +92,11 @@ export interface CreateUserInput {
   address: string;
   role: UserRole;
   status: UserStatus;
+  /** Solo para estudiantes; opcional. */
+  careerId?: string | null;
+  careerName?: string | null;
+  semester?: number | null;
+  shift?: Shift | null;
 }
 
 /** Datos institucionales editables por un ADMIN (no incluye rol ni estado). */
@@ -165,6 +181,10 @@ export function normalizeProfile(data: Record<string, unknown>, uid: string): Us
     status: normalizeStatus(data['status']),
     authProvider: (data['authProvider'] as string | undefined) ?? 'password',
     profileCompleted: (data['profileCompleted'] as boolean | undefined) ?? true,
+    careerId: (data['careerId'] as string | null | undefined) ?? null,
+    careerName: (data['careerName'] as string | null | undefined) ?? null,
+    semester: typeof data['semester'] === 'number' ? (data['semester'] as number) : null,
+    shift: data['shift'] === 'MORNING' ? 'MORNING' : data['shift'] === 'EVENING' ? 'EVENING' : null,
   };
 }
 

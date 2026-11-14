@@ -4,12 +4,13 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { catchError, of, switchMap } from 'rxjs';
 
-import { courseLabel } from '../../core/models/course.model';
+import { courseLabel, SHIFT_LABELS } from '../../core/models/course.model';
 import {
   ENROLLMENT_STATUS_LABELS,
   Enrollment,
   EnrollmentCode,
 } from '../../core/models/enrollment.model';
+import { semesterLabel } from '../../core/models/career.model';
 import { fullName } from '../../core/models/user.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
 import { EnrollmentService } from '../../core/services/enrollment.service';
@@ -142,9 +143,22 @@ import { ToastService } from '../../shared/toast/toast.service';
           </div>
 
           <div class="mt-4 rounded-2xl bg-surface-container-high/40 p-4">
-            <app-student-picker [students]="enrollable()" [selected]="pendingStudentIds()"
-              label="Inscribir estudiantes manualmente" placeholder="Buscar y seleccionar estudiantes activos…"
-              [disabled]="busy()" (selectedChange)="studentsToEnroll.set($event)" />
+            @if (matchedCount(); as mc) {
+              @if (mc.matched === 0) {
+                <p class="mb-3 rounded-xl bg-surface-container-high px-4 py-2.5 text-xs text-on-surface-variant">
+                  No hay estudiantes sin inscribir que coincidan con el ciclo y turno de este curso.
+                </p>
+              } @else if (mc.matched < mc.total) {
+                <p class="mb-3 rounded-xl bg-primary-fixed px-4 py-2.5 text-xs text-primary">
+                  <strong>Mostrando {{ mc.matched }} de {{ mc.total }} estudiantes</strong> que coinciden con la carrera, ciclo y turno del curso.
+                </p>
+              }
+            }
+            @for (cid of [courseId()]; track cid) {
+              <app-student-picker [students]="enrollable()" [selected]="pendingStudentIds()"
+                label="Inscribir estudiantes manualmente" placeholder="Buscar y seleccionar estudiantes activos…"
+                [disabled]="busy()" (selectedChange)="studentsToEnroll.set($event)" />
+            }
             <div class="mt-3 flex justify-end">
               <button type="button" class="btn btn-primary w-full sm:w-auto"
                 [disabled]="busy() || !pendingStudentIds().length" (click)="enrollSelected()">
@@ -245,6 +259,8 @@ export class Enrollments {
   protected readonly label = courseLabel;
   protected readonly name = fullName;
   protected readonly enrollmentLabels = ENROLLMENT_STATUS_LABELS;
+  protected readonly shiftLabels = SHIFT_LABELS;
+  protected readonly semesterLabel = semesterLabel;
 
   protected readonly courses = toSignal(this.scope.courses$, { initialValue: [] });
   private readonly students = toSignal(this.scope.students$, { initialValue: [] });
@@ -323,7 +339,35 @@ export class Enrollments {
 
   protected readonly enrollable = computed(() => {
     const enrolled = new Set(this.enrollments().filter((e) => e.status === 'ACTIVE').map((e) => e.studentId));
-    return this.students().filter((s) => s.status === 'ACTIVE' && !enrolled.has(s.uid));
+    const notEnrolled = this.students().filter((s) => s.status === 'ACTIVE' && !enrolled.has(s.uid));
+    const course = this.courses().find((c) => c.id === this.courseId());
+    if (!course) return notEnrolled;
+    const { careerId, semester, shift } = course;
+    if (!careerId && !semester && !shift) return notEnrolled;
+
+    return notEnrolled.filter((s) => {
+      if (careerId && s.careerId && s.careerId !== careerId) return false;
+      if (semester && s.semester && s.semester !== semester) return false;
+      if (shift && s.shift && s.shift !== shift) return false;
+      return true;
+    });
+  });
+
+  /** Cantidad de alumnos que coinciden con el filtro carrera+ciclo+turno del curso. */
+  protected readonly matchedCount = computed(() => {
+    const enrolled = new Set(this.enrollments().filter((e) => e.status === 'ACTIVE').map((e) => e.studentId));
+    const notEnrolled = this.students().filter((s) => s.status === 'ACTIVE' && !enrolled.has(s.uid));
+    const course = this.courses().find((c) => c.id === this.courseId());
+    if (!course) return null;
+    const { careerId, semester, shift } = course;
+    if (!careerId && !semester && !shift) return null;
+    const matched = notEnrolled.filter((s) => {
+      if (careerId && s.careerId && s.careerId !== careerId) return false;
+      if (semester && s.semester && s.semester !== semester) return false;
+      if (shift && s.shift && s.shift !== shift) return false;
+      return true;
+    });
+    return { matched: matched.length, total: notEnrolled.length };
   });
 
   /** El selector emite una lista; aquí solo se trabaja con un curso (o ninguno al limpiar). */

@@ -1,5 +1,17 @@
 import { Timestamp } from '@angular/fire/firestore';
 
+export const SHIFTS = ['MORNING', 'EVENING'] as const;
+export type Shift = (typeof SHIFTS)[number];
+
+export const SHIFT_LABELS: Record<Shift, string> = {
+  MORNING: 'Mañana',
+  EVENING: 'Noche',
+};
+export const SHIFT_BADGE: Record<Shift, string> = {
+  MORNING: 'badge badge-yellow',
+  EVENING: 'badge badge-blue',
+};
+
 export const COURSE_STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 export type CourseStatus = (typeof COURSE_STATUSES)[number];
 
@@ -58,6 +70,8 @@ export interface Course {
   /** Copia del nombre del periodo ("2026-II"). */
   academicPeriodName: string | null;
   section: string;
+  /** Turno en que se dicta la sección (Mañana / Noche). null en registros previos a esta versión. */
+  shift: Shift | null;
   /** Aula o salón de esta sección (opcional). */
   room: string;
   /** Horario semanal del curso (puede tener varios bloques). */
@@ -77,6 +91,7 @@ export type CourseInput = Pick<
   | 'name'
   | 'description'
   | 'section'
+  | 'shift'
   | 'room'
   | 'teacherIds'
   | 'status'
@@ -142,6 +157,7 @@ export function normalizeCourse(data: Record<string, unknown>, id: string): Cour
       (data['academicPeriodName'] as string | null | undefined) ??
       ((data['academicPeriodId'] as string | null | undefined) ?? null),
     section: (data['section'] as string | undefined) ?? '',
+    shift: data['shift'] === 'MORNING' ? 'MORNING' : data['shift'] === 'EVENING' ? 'EVENING' : null,
     room: (data['room'] as string | undefined) ?? '',
     schedule: normalizeSchedule(data['schedule']),
     teacherIds: Array.isArray(data['teacherIds']) ? (data['teacherIds'] as string[]) : [],
@@ -170,4 +186,10 @@ export function courseLabel(course: Pick<Course, 'courseCode' | 'name' | 'sectio
   if (!course) return '—';
   const section = course.section ? ` (${course.section})` : '';
   return `${course.courseCode} · ${course.name}${section}`;
+}
+
+/** "Mañana" / "Noche" / "—". */
+export function shiftLabel(shift: Shift | null | undefined): string {
+  if (!shift) return '—';
+  return SHIFT_LABELS[shift];
 }

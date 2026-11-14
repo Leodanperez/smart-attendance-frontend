@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { CircleCheck, Download, Eye, Power, Search, Upload, UserPlus, Users } from 'lucide-angular';
@@ -37,8 +37,7 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
       <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <h1 class="page-title">Usuarios</h1>
-          <p class="page-subtitle">{{ filtered().length }} de {{ users().length }} usuarios registrados</p>
-        </div>
+          <p class="page-subtitle">{{ filtered().length }} de {{ users().length }} usuarios registrados</p>        </div>
         <div class="flex flex-wrap gap-3">
           <button type="button" class="btn btn-secondary" (click)="exportCsv()">
             <app-icon [name]="icons.download" /> Exportar CSV
@@ -54,7 +53,7 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
 
       <!-- Filtros -->
       <div class="card grid gap-4 md:grid-cols-12">
-        <div class="md:col-span-6">
+        <div class="md:col-span-5">
           <label for="search" class="label">Buscar</label>
           <div class="relative">
             <app-icon [name]="icons.search" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-outline" />
@@ -62,7 +61,7 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
               #q (input)="search.set(q.value)" />
           </div>
         </div>
-        <div class="md:col-span-3">
+        <div class="md:col-span-2">
           <label for="role" class="label">Rol</label>
           <select id="role" class="input" #r (change)="role.set($any(r.value))">
             <option value="">Todos</option>
@@ -71,12 +70,20 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
             }
           </select>
         </div>
-        <div class="md:col-span-3">
+        <div class="md:col-span-2">
           <label for="status" class="label">Estado</label>
           <select id="status" class="input" #s (change)="status.set($any(s.value))">
             <option value="">Todos</option>
             @for (item of statuses; track item) {
               <option [value]="item">{{ statusLabels[item] }}</option>
+            }
+          </select>
+        </div>
+        <div class="md:col-span-3">
+          <label for="perPage" class="label">Por página</label>
+          <select id="perPage" class="input" #pp [value]="perPage()" (change)="setPerPage(+pp.value)">
+            @for (size of PAGE_SIZES; track size) {
+              <option [value]="size">{{ size }}</option>
             }
           </select>
         </div>
@@ -103,7 +110,7 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
             </tr>
           </thead>
           <tbody>
-            @for (u of filtered(); track u.uid) {
+            @for (u of paginated(); track u.uid) {
               <tr class="group">
                 <td>
                   <div class="flex items-center gap-3">
@@ -161,8 +168,7 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
 
       <!-- Tarjetas (móvil) -->
       <ul class="space-y-3 md:hidden">
-        @for (u of filtered(); track u.uid) {
-          <li class="card p-4">
+        @for (u of paginated(); track u.uid) {          <li class="card p-4">
             <div class="flex items-start gap-3">
               <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary" aria-hidden="true">
                 {{ initials(u) }}
@@ -198,6 +204,35 @@ import { UsersImportDialog, UsersImportDialogData } from './import/users-import-
           <li class="card text-center text-sm text-on-surface-variant">No hay usuarios con estos filtros.</li>
         }
       </ul>
+
+      <!-- Paginación -->
+      @if (totalPages() > 1) {
+        <nav aria-label="Paginación de usuarios" class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-on-surface-variant">
+            Página <strong>{{ page() }}</strong> de <strong>{{ totalPages() }}</strong>
+            · {{ filtered().length }} resultado(s)
+          </p>
+          <div class="flex items-center gap-1">
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="page() === 1" (click)="setPage(1)" aria-label="Primera página">«</button>
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="page() === 1" (click)="setPage(page() - 1)" aria-label="Página anterior">‹</button>
+            @for (n of pageNumbers(); track n) {
+              @if (n === null) {
+                <span class="px-1 text-on-surface-variant select-none">…</span>
+              } @else {
+                <button type="button"
+                  class="btn btn-sm min-w-9"
+                  [class]="n === page() ? 'btn-primary' : 'btn-secondary'"
+                  (click)="setPage(n)"
+                  [attr.aria-current]="n === page() ? 'page' : null">
+                  {{ n }}
+                </button>
+              }
+            }
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="page() === totalPages()" (click)="setPage(page() + 1)" aria-label="Página siguiente">›</button>
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="page() === totalPages()" (click)="setPage(totalPages())" aria-label="Última página">»</button>
+          </div>
+        </nav>
+      }
     </div>
   `,
 })
@@ -231,6 +266,11 @@ export class UsersList {
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
 
+  // Paginación
+  protected readonly PAGE_SIZES = [10, 20, 50, 80, 100] as const;
+  protected readonly perPage = signal<number>(10);
+  protected readonly page = signal(1);
+
   protected readonly users = toSignal(
     this.userService.getAll().pipe(
       catchError((e) => {
@@ -240,6 +280,14 @@ export class UsersList {
     ),
     { initialValue: [] as UserProfile[] },
   );
+
+  constructor() {
+    // Volver a la página 1 cuando cambia cualquier filtro
+    effect(() => {
+      this.search(); this.role(); this.status();
+      this.page.set(1);
+    });
+  }
 
   protected readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -252,6 +300,37 @@ export class UsersList {
         .some((v) => String(v).toLowerCase().includes(term));
     });
   });
+
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.perPage())));
+
+  protected readonly paginated = computed(() => {
+    const p = Math.min(this.page(), this.totalPages());
+    const size = this.perPage();
+    return this.filtered().slice((p - 1) * size, p * size);
+  });
+
+  protected readonly pageNumbers = computed(() => {
+    const total = this.totalPages();
+    const current = this.page();
+    const pages = new Set([1, total, current, current - 1, current + 1].filter((n) => n >= 1 && n <= total));
+    const sorted = [...pages].sort((a, b) => a - b);
+    // Incluye un marcador null donde hay salto para mostrar "…" en el template
+    const result: (number | null)[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] > sorted[i - 1] + 1) result.push(null);
+      result.push(sorted[i]);
+    }
+    return result;
+  });
+
+  protected setPage(p: number): void {
+    this.page.set(Math.max(1, Math.min(p, this.totalPages())));
+  }
+
+  protected setPerPage(size: number): void {
+    this.perPage.set(size);
+    this.page.set(1);
+  }
 
   protected initials(u: UserProfile): string {
     return ((u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '')).toUpperCase() || '?';

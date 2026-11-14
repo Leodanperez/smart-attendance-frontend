@@ -11,6 +11,8 @@ import {
 } from '@angular/core';
 
 import { UserProfile, fullName } from '../../core/models/user.model';
+import { SHIFT_LABELS } from '../../core/models/course.model';
+import { semesterLabel } from '../../core/models/career.model';
 
 let nextId = 0;
 
@@ -68,6 +70,13 @@ let nextId = 0;
                     <span class="block truncate text-xs text-on-surface-variant">
                       {{ s.institutionalCode || 'Sin código' }} · {{ s.email }}
                     </span>
+                    @if (s.role === 'STUDENT' && (s.careerName || s.semester || s.shift)) {
+                      <span class="mt-0.5 flex flex-wrap gap-x-2 gap-y-0 text-xs text-on-surface-variant">
+                        @if (s.careerName) { <span>{{ s.careerName }}</span> }
+                        @if (s.semester) { <span>· {{ semesterLabelFn(s.semester) }}</span> }
+                        @if (s.shift) { <span class="font-medium">· {{ shiftLabels[s.shift] }}</span> }
+                      </span>
+                    }
                   </span>
                 </label>
               </li>
@@ -105,6 +114,8 @@ export class StudentPicker {
 
   protected readonly uid = `student-picker-${nextId++}`;
   protected readonly name = fullName;
+  protected readonly shiftLabels = SHIFT_LABELS;
+  protected readonly semesterLabelFn = semesterLabel;
   protected readonly open = signal(false);
   protected readonly query = signal('');
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -125,7 +136,8 @@ export class StudentPicker {
       .filter(
         (s) =>
           !term ||
-          [fullName(s), s.institutionalCode, s.email, s.documentNumber]
+          [fullName(s), s.institutionalCode, s.email, s.documentNumber, s.careerName,
+            s.shift ? SHIFT_LABELS[s.shift] : null]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(term)),
       )

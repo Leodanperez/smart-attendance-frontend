@@ -5,6 +5,7 @@ import {
   UserRole,
   UserStatus,
 } from '../../../core/models/user.model';
+import { Shift } from '../../../core/models/course.model';
 
 /**
  * Modelo del formulario de registro (fuente de verdad del Signal Form).
@@ -31,6 +32,13 @@ export interface UserFormModel {
     status: UserStatus;
     /** Se genera: sidem + documento (solo lectura en la UI). */
     password: string;
+  };
+  /** Solo visible cuando role === 'STUDENT'. Todos opcionales. */
+  academic: {
+    careerId: string;
+    careerName: string;
+    semester: string;   // '' | '1' | '2' … se convierte a number al guardar
+    shift: Shift | '';
   };
 }
 
@@ -67,12 +75,19 @@ export function initialUserForm(): UserFormModel {
       status: 'ACTIVE',
       password: '',
     },
+    academic: {
+      careerId: '',
+      careerName: '',
+      semester: '',
+      shift: '',
+    },
   };
 }
 
 /** Normaliza y convierte el valor del formulario al input del servicio (ya validado). */
 export function toCreateUserInput(value: UserFormModel): CreateUserInput {
-  const { personal, contact, account } = value;
+  const { personal, contact, account, academic } = value;
+  const isStudent = account.role === 'STUDENT';
   return {
     firstName: personal.firstName.trim(),
     lastName: personal.lastName.trim(),
@@ -86,5 +101,9 @@ export function toCreateUserInput(value: UserFormModel): CreateUserInput {
     role: account.role as UserRole,
     status: account.status,
     password: account.password,
+    careerId: isStudent && academic.careerId ? academic.careerId : null,
+    careerName: isStudent && academic.careerName ? academic.careerName : null,
+    semester: isStudent && academic.semester ? Number(academic.semester) : null,
+    shift: isStudent && academic.shift ? academic.shift : null,
   };
 }

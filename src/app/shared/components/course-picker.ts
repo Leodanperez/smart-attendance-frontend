@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 
 import { semesterLabel } from '../../core/models/career.model';
-import { Course } from '../../core/models/course.model';
+import { Course, SHIFT_LABELS } from '../../core/models/course.model';
 
 let nextId = 0;
 
@@ -95,6 +95,9 @@ let nextId = 0;
                         <span class="font-medium">{{ c.courseCode }}</span>
                         <span>{{ c.careerName || 'Sin carrera' }}</span>
                         <span>{{ semesterLabel(c.semester) }}</span>
+                        @if (c.shift) {
+                          <span>{{ shiftLabels[c.shift] }}</span>
+                        }
                         <span>{{ c.academicPeriodName || '—' }}</span>
                       </span>
                     </span>
@@ -135,6 +138,7 @@ export class CoursePicker {
 
   protected readonly uid = `course-picker-${nextId++}`;
   protected readonly semesterLabel = semesterLabel;
+  protected readonly shiftLabels = SHIFT_LABELS;
   protected readonly open = signal(false);
   protected readonly query = signal('');
   protected readonly careerFilter = signal('');
@@ -158,7 +162,8 @@ export class CoursePicker {
       .filter(
         (c) =>
           !term ||
-          [c.name, c.courseCode, c.section, c.room, c.careerName, c.academicPeriodName]
+          [c.name, c.courseCode, c.section, c.room, c.careerName, c.academicPeriodName,
+            c.shift ? SHIFT_LABELS[c.shift] : null]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(term)),
       );

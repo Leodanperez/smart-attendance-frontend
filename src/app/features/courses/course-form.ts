@@ -10,6 +10,9 @@ import {
   Course,
   CourseStatus,
   ScheduleBlock,
+  SHIFTS,
+  SHIFT_LABELS,
+  Shift,
   WEEK_DAYS,
   WEEK_DAY_LABELS,
   WeekDay,
@@ -125,6 +128,16 @@ import { ToastService } from '../../shared/toast/toast.service';
             }
           </div>
           <div>
+            <label for="shift" class="label">Turno</label>
+            <select id="shift" formControlName="shift" class="input">
+              <option [ngValue]="null">Sin turno definido</option>
+              @for (s of shifts; track s) {
+                <option [value]="s">{{ shiftLabels[s] }}</option>
+              }
+            </select>
+            <p class="hint">Permite distinguir grupos del mismo ciclo que se dictan en horarios distintos.</p>
+          </div>
+          <div>
             <label for="room" class="label">Aula</label>
             <input id="room" formControlName="room" placeholder="Lab 1 / Aula 203" class="input"
               [attr.aria-invalid]="invalid('room')" aria-describedby="room-error" />
@@ -220,6 +233,8 @@ export class CourseForm {
 
   protected readonly statuses = COURSE_STATUSES;
   protected readonly statusLabels = COURSE_STATUS_LABELS;
+  protected readonly shifts = SHIFTS;
+  protected readonly shiftLabels = SHIFT_LABELS;
   protected readonly name = fullName;
 
   protected readonly saving = signal(false);
@@ -250,6 +265,7 @@ export class CourseForm {
     careerId: ['', Validators.required],
     semester: this.fb.control<number | null>(null, Validators.required),
     section: ['', [Validators.required, Validators.maxLength(10)]],
+    shift: this.fb.control<Shift | null>(null),
     room: ['', [Validators.maxLength(40)]],
     status: this.fb.control<CourseStatus>('ACTIVE'),
   });
@@ -304,6 +320,7 @@ export class CourseForm {
         careerId: course.careerId ?? '',
         semester: course.semester,
         section: course.section,
+        shift: course.shift,
         room: course.room,
         status: course.status,
       });
@@ -377,6 +394,7 @@ export class CourseForm {
       const input = {
         ...value,
         semester: value.semester,
+        shift: value.shift ?? null,
         academicPeriodName: period.name,
         careerName: career.name,
         teacherIds: selectedIds,

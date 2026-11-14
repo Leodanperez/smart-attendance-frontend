@@ -14,6 +14,11 @@ import {
   COURSE_STATUS_LABELS,
   Course,
   CourseStatus,
+  SHIFTS,
+  SHIFT_LABELS,
+  SHIFT_BADGE,
+  Shift,
+  shiftLabel,
 } from '../../core/models/course.model';
 import { fullName } from '../../core/models/user.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
@@ -82,6 +87,15 @@ import { ToastService } from '../../shared/toast/toast.service';
           }
         </select>
       </div>
+      <div>
+        <label for="shift-filter" class="label">Turno</label>
+        <select id="shift-filter" class="input" #sh (change)="shift.set($any(sh.value))">
+          <option value="">Todos</option>
+          @for (s of shifts; track s) {
+            <option [value]="s">{{ shiftLabels[s] }}</option>
+          }
+        </select>
+      </div>
     </div>
 
     @if (error() || scope.error()) {
@@ -98,6 +112,7 @@ import { ToastService } from '../../shared/toast/toast.service';
             <th scope="col">Periodo</th>
             <th scope="col">Carrera</th>
             <th scope="col">Ciclo</th>
+            <th scope="col">Turno</th>
             <th scope="col">Sección</th>
             <th scope="col">Aula</th>
             <th scope="col">Docentes asignados</th>
@@ -116,6 +131,13 @@ import { ToastService } from '../../shared/toast/toast.service';
               <td class="font-mono text-xs whitespace-nowrap">{{ c.academicPeriodName || '—' }}</td>
               <td>{{ c.careerName || 'Sin carrera' }}</td>
               <td class="whitespace-nowrap">{{ semesterLabel(c.semester) }}</td>
+              <td>
+                @if (c.shift) {
+                  <span [class]="shiftBadge[c.shift]">{{ shiftLabels[c.shift] }}</span>
+                } @else {
+                  <span class="text-on-surface-variant">—</span>
+                }
+              </td>
               <td>{{ c.section || '—' }}</td>
               <td>{{ c.room || '—' }}</td>
               <td>{{ teacherNames(c) }}</td>
@@ -139,7 +161,7 @@ import { ToastService } from '../../shared/toast/toast.service';
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="11" class="text-center text-on-surface-variant">No hay cursos con estos filtros.</td></tr>
+            <tr><td colspan="12" class="text-center text-on-surface-variant">No hay cursos con estos filtros.</td></tr>
           }
         </tbody>
       </table>
@@ -160,6 +182,16 @@ import { ToastService } from '../../shared/toast/toast.service';
             <div><dt class="text-on-surface-variant">Periodo</dt><dd class="text-on-surface">{{ c.academicPeriodName || '—' }}</dd></div>
             <div><dt class="text-on-surface-variant">Ciclo</dt><dd class="text-on-surface">{{ semesterLabel(c.semester) }}</dd></div>
             <div><dt class="text-on-surface-variant">Carrera</dt><dd class="truncate text-on-surface">{{ c.careerName || 'Sin carrera' }}</dd></div>
+            <div>
+              <dt class="text-on-surface-variant">Turno</dt>
+              <dd class="text-on-surface">
+                @if (c.shift) {
+                  <span [class]="shiftBadge[c.shift]">{{ shiftLabels[c.shift] }}</span>
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
             <div><dt class="text-on-surface-variant">Sección / Aula</dt><dd class="text-on-surface">{{ c.section || '—' }}{{ c.room ? ' · ' + c.room : '' }}</dd></div>
             <div class="col-span-2"><dt class="text-on-surface-variant">Docente(s)</dt><dd class="text-on-surface">{{ teacherNames(c) }}</dd></div>
             @if (!isStudent()) {
@@ -193,6 +225,9 @@ export class CoursesList {
   protected readonly statuses = COURSE_STATUSES;
   protected readonly statusLabels = COURSE_STATUS_LABELS;
   protected readonly statusBadge = COURSE_STATUS_BADGE;
+  protected readonly shifts = SHIFTS;
+  protected readonly shiftLabels = SHIFT_LABELS;
+  protected readonly shiftBadge = SHIFT_BADGE;
 
   protected readonly isAdmin = computed(() => this.user()?.role === 'ADMIN');
   protected readonly isStudent = computed(() => this.user()?.role === 'STUDENT');
@@ -203,6 +238,7 @@ export class CoursesList {
   protected readonly semesterLabel = semesterLabel;
   protected readonly search = signal('');
   protected readonly status = signal<CourseStatus | ''>('');
+  protected readonly shift = signal<Shift | ''>('');
   protected readonly careerId = signal('');
   protected readonly semester = signal('');
   /** Query param ?periodId= (desde la página de periodos). */
@@ -271,6 +307,7 @@ export class CoursesList {
       if (this.periodId() && c.academicPeriodId !== this.periodId()) return false;
       if (this.careerId() && c.careerId !== this.careerId()) return false;
       if (this.semester() && String(c.semester) !== this.semester()) return false;
+      if (this.shift() && c.shift !== this.shift()) return false;
       if (!term) return true;
       return [c.courseCode, c.name, c.section, c.room, c.careerName].some((v) => v?.toLowerCase().includes(term));
     });
@@ -310,13 +347,14 @@ export class CoursesList {
   exportCsv(): void {
     downloadCsv(
       `cursos-${fileDate()}`,
-      ['Código', 'Nombre', 'Periodo', 'Carrera', 'Ciclo', 'Sección', 'Aula', 'Docentes', 'Estudiantes', 'Estado'],
+      ['Código', 'Nombre', 'Periodo', 'Carrera', 'Ciclo', 'Turno', 'Sección', 'Aula', 'Docentes', 'Estudiantes', 'Estado'],
       this.filtered().map((c) => [
         c.courseCode,
         c.name,
         c.academicPeriodName,
         c.careerName,
         c.semester,
+        c.shift ? SHIFT_LABELS[c.shift] : '',
         c.section,
         c.room,
         this.teacherNames(c),

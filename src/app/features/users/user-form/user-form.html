@@ -208,6 +208,52 @@
       </div>
     </fieldset>
 
+    <!-- ================= Datos académicos (solo estudiantes) ================= -->
+    @if (isStudentRole()) {
+      <fieldset class="card p-0">
+        <legend class="sr-only">Datos académicos</legend>
+        <div class="flex items-center gap-3 border-b border-outline-variant/50 px-6 py-4" aria-hidden="true">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+            <app-icon [name]="icons.code" [size]="20" />
+          </span>
+          <div>
+            <p class="section-title">Datos académicos</p>
+            <p class="text-xs text-on-surface-variant">Carrera, ciclo y turno del estudiante (opcional, facilita la inscripción)</p>
+          </div>
+        </div>
+        <div class="grid gap-5 p-6 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label for="careerId" class="label">Carrera</label>
+            <select id="careerId" [formField]="userForm.academic.careerId" class="input">
+              <option value="">Sin carrera asignada</option>
+              @for (c of activeCareerOptions(); track c.id) {
+                <option [value]="c.id">{{ c.code }} · {{ c.name }}</option>
+              }
+            </select>
+            <p class="hint">Al inscribir al estudiante en un curso, solo aparecerá si coincide con la carrera y ciclo del curso.</p>
+          </div>
+          <div>
+            <label for="academic-semester" class="label">Ciclo</label>
+            <select id="academic-semester" [formField]="userForm.academic.semester" class="input">
+              <option value="">Sin ciclo asignado</option>
+              @for (n of semesterOptions(); track n) {
+                <option [value]="n">{{ semesterLabel(n) }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label for="academic-shift" class="label">Turno</label>
+            <select id="academic-shift" [formField]="userForm.academic.shift" class="input">
+              <option value="">Sin turno asignado</option>
+              @for (s of shifts; track s) {
+                <option [value]="s">{{ shiftLabels[s] }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </fieldset>
+    }
+
     <!-- Acciones -->
     <div class="card flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-xs text-on-surface-variant">El registro quedará en la auditoría con tu usuario.</p>

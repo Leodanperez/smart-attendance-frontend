@@ -8,6 +8,7 @@ import {
   UserRole,
   UserStatus,
 } from '../../../core/models/user.model';
+import { Shift } from '../../../core/models/course.model';
 import { DOCUMENT_PATTERNS, NAME_PATTERN, PASSWORD_PATTERN } from '../../../shared/validators/user-validators';
 import { generatedEmail, generatedPassword } from '../user-form/user-form.model';
 
@@ -17,18 +18,23 @@ export const MAX_IMPORT_ROWS = 500;
 /** Cabeceras de la plantilla, en el orden pedido. */
 export const IMPORT_HEADERS = [
   'nombres', 'apellidos', 'tipodni', 'dni', 'fechanac', 'sexo', 'correo', 'rol', 'estado', 'contraseña',
+  'carrera', 'ciclo', 'turno',
 ] as const;
 
 /** Filas de ejemplo de la plantilla (correo y contraseña vacíos = se generan). */
 export const IMPORT_TEMPLATE_ROWS: string[][] = [
-  ['Ana María', 'López Ramírez', 'DNI', '76957680', '2001-05-14', 'F', '', 'Estudiante', 'Activo', ''],
-  ['Luis', 'Pérez Soto', 'DNI', '45871236', '1985-11-02', 'M', '', 'Docente', 'Activo', ''],
+  ['Ana María', 'López Ramírez', 'DNI', '76957680', '2001-05-14', 'F', '', 'Estudiante', 'Activo', '', 'Desarrollo de Sistemas de Información', '1', 'Mañana'],
+  ['Luis', 'Pérez Soto', 'DNI', '45871236', '1985-11-02', 'M', '', 'Docente', 'Activo', '', '', '', ''],
 ];
 
 /** Fila válida lista para crear. `line` es el número de fila en el archivo (la cabecera es la 1). */
 export interface ImportRow {
   line: number;
   input: CreateUserInput;
+  /** Nombre de carrera del Excel (para resolver el id en el diálogo si se pasa el catálogo). */
+  careerNameRaw: string;
+  semesterRaw: number | null;
+  shiftRaw: Shift | null;
 }
 
 /** Fila que no se subió y por qué. */
@@ -48,7 +54,8 @@ export interface ParsedImport {
 
 type Field =
   | 'firstName' | 'lastName' | 'documentType' | 'documentNumber' | 'birthDate'
-  | 'gender' | 'email' | 'role' | 'status' | 'password';
+  | 'gender' | 'email' | 'role' | 'status' | 'password'
+  | 'careerName' | 'semester' | 'shift';
 
 /** Nombres de cabecera aceptados (ya normalizados: minúsculas, sin tildes ni símbolos). */
 const HEADER_ALIASES: Record<Field, readonly string[]> = {
@@ -62,6 +69,9 @@ const HEADER_ALIASES: Record<Field, readonly string[]> = {
   role: ['rol'],
   status: ['estado'],
   password: ['contrasena', 'contrasenia', 'password', 'clave'],
+  careerName: ['carrera', 'nombrecarrera', 'carreraprofeisonal'],
+  semester: ['ciclo', 'semestre', 'nivel'],
+  shift: ['turno'],
 };
 
 const REQUIRED_FIELDS: readonly Field[] = ['firstName', 'lastName', 'documentNumber', 'birthDate', 'gender', 'role'];
@@ -77,6 +87,9 @@ const FIELD_LABELS: Record<Field, string> = {
   role: 'rol',
   status: 'estado',
   password: 'contraseña',
+  careerName: 'carrera',
+  semester: 'ciclo',
+  shift: 'turno',
 };
 
 /** Texto sin tildes, en mayúsculas y solo letras/números (para comparar valores y cabeceras). */
@@ -88,8 +101,7 @@ function key(value: unknown): string {
     .replace(/[^A-Z0-9]/g, '');
 }
 
-const DOCUMENT_TYPE_VALUES: Record<string, DocumentType> = {
-  DNI: 'DNI',
+const DOCUMENT_TYPE_VALUES: Record<string, DocumentType> = {  DNI: 'DNI',
   CE: 'CE',
   CARNETDEEXTRANJERIA: 'CE',
   CARNEEXTRANJERIA: 'CE',
@@ -111,6 +123,11 @@ const STATUS_VALUES: Record<string, UserStatus> = {
   ACTIVO: 'ACTIVE', ACTIVE: 'ACTIVE',
   PENDIENTE: 'PENDING', PENDING: 'PENDING',
   DESHABILITADO: 'DISABLED', INACTIVO: 'DISABLED', DISABLED: 'DISABLED',
+};
+
+const SHIFT_VALUES: Record<string, Shift> = {
+  MANANA: 'MORNING', MORNING: 'MORNING', MAÑANA: 'MORNING', M: 'MORNING',
+  NOCHE: 'EVENING', EVENING: 'EVENING', TARDE: 'EVENING', N: 'EVENING',
 };
 
 // ---------------------------------------------------------------- lectura de archivos
@@ -344,6 +361,16 @@ export function parseImport(rows: readonly (readonly unknown[])[]): ParsedImport
       else if (!PASSWORD_PATTERN.test(passwordText)) errors.push('contraseña: debe incluir letras y números');
     }
 
+    // Campos académicos opcionales (solo para estudiantes; se ignoran en otros roles).
+    const careerNameRaw = cellText(get(row, 'careerName'));
+    const semesterRaw = (() => {
+      const v = cellText(get(row, 'semester'));
+      const n = Number(v);
+      return v && Number.isInteger(n) && n >= 1 ? n : null;
+    })();
+    const shiftText = cellText(get(row, 'shift'));
+    const shiftRaw: Shift | null = shiftText ? (SHIFT_VALUES[key(shiftText)] ?? null) : null;
+
     // Duplicados dentro del propio archivo.
     if (documentNumber) {
       const first = seenDocuments.get(documentNumber);
@@ -381,7 +408,15 @@ export function parseImport(rows: readonly (readonly unknown[])[]): ParsedImport
         address: '',
         role,
         status,
+        // Académicos: se cargan en el diálogo si el rol es STUDENT
+        careerId: null,  // se resuelve en el diálogo contra la lista de carreras
+        careerName: role === 'STUDENT' ? (careerNameRaw || null) : null,
+        semester: role === 'STUDENT' ? semesterRaw : null,
+        shift: role === 'STUDENT' ? shiftRaw : null,
       },
+      careerNameRaw: role === 'STUDENT' ? careerNameRaw : '',
+      semesterRaw: role === 'STUDENT' ? semesterRaw : null,
+      shiftRaw: role === 'STUDENT' ? shiftRaw : null,
     });
   }
 

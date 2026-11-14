@@ -37,6 +37,11 @@ import {
   ROLE_CODE_PREFIX,
   buildInstitutionalCode,
 } from '../../../core/models/user.model';
+import { SHIFTS, SHIFT_LABELS, Shift } from '../../../core/models/course.model';
+import { semesterLabel, semesterOptions } from '../../../core/models/career.model';
+import { CareerService } from '../../../core/services/career.service';
+import { catchError, of } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { errorMessage } from '../../../core/services/error-message';
 import { UserService } from '../../../core/services/user.service';
 import { FieldError, showInvalid } from '../../../shared/components/field-error';
@@ -78,7 +83,20 @@ export class UserForm {
   protected readonly statusLabels = USER_STATUS_LABELS;
   protected readonly genderLabels = GENDER_LABELS;
   protected readonly documentTypeLabels = DOCUMENT_TYPE_LABELS;
+  protected readonly shifts = SHIFTS;
+  protected readonly shiftLabels = SHIFT_LABELS;
+  protected readonly semesterLabel = semesterLabel;
   protected readonly invalid = showInvalid;
+
+  // Carreras para el selector académico
+  private readonly careerService = inject(CareerService);
+  protected readonly allCareers = toSignal(
+    this.careerService.getAll().pipe(catchError(() => of([]))),
+    { initialValue: [] },
+  );
+  protected readonly activeCareerOptions = computed(() =>
+    this.allCareers().filter((c) => c.status === 'ACTIVE'),
+  );
   protected readonly icons = {
     back: ArrowLeft,
     alert: CircleAlert,
@@ -108,8 +126,6 @@ export class UserForm {
 
   constructor() {
     // Correo y contraseña inicial se generan del documento (solo lectura en la UI):
-    //   correo     = documento@sidem.edu.pe     (ej. 76957680@sidem.edu.pe)
-    //   contraseña = sidem + documento          (ej. sidem76957680)
     effect(() => {
       const doc = this.userForm.personal.documentNumber().value();
       const email = generatedEmail(doc);
@@ -119,6 +135,18 @@ export class UserForm {
           ...m,
           contact: { ...m.contact, email },
           account: { ...m.account, password },
+        })),
+      );
+    });
+    // Sincroniza careerName cuando el admin cambia la carrera en el selector.
+    effect(() => {
+      const id = this.userForm.academic.careerId().value();
+      const career = this.allCareers().find((c) => c.id === id);
+      const name = career?.name ?? '';
+      untracked(() =>
+        this.model.update((m) => ({
+          ...m,
+          academic: { ...m.academic, careerName: name },
         })),
       );
     });
@@ -137,6 +165,16 @@ export class UserForm {
   protected readonly emailError = computed(() => this.userForm.contact.email().errors()[0]?.message ?? null);
 
   protected readonly isDni = computed(() => this.userForm.personal.documentType().value() === 'DNI');
+
+  /** true cuando el rol seleccionado es STUDENT (para mostrar la sección académica). */
+  protected readonly isStudentRole = computed(() => this.userForm.account.role().value() === 'STUDENT');
+
+  /** Ciclos disponibles según la carrera elegida en la sección académica. */
+  protected readonly semesterOptions = computed(() => {
+    const id = this.userForm.academic.careerId().value();
+    const career = this.allCareers().find((c) => c.id === id);
+    return semesterOptions(career);
+  });
   /** Vista previa del código que se generará: STU-/TEA-/ADM- + número de documento. */
   protected readonly codePreview = computed(() => {
     const role = this.userForm.account.role().value();

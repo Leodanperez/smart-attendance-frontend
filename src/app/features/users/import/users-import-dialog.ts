@@ -11,8 +11,12 @@ import {
 } from 'lucide-angular';
 
 import { ROLE_LABELS, USER_STATUS_LABELS } from '../../../core/models/user.model';
+import { SHIFT_LABELS } from '../../../core/models/course.model';
+import { semesterLabel } from '../../../core/models/career.model';
 import { errorMessage } from '../../../core/services/error-message';
 import { UserService } from '../../../core/services/user.service';
+import { CareerService } from '../../../core/services/career.service';
+import { firstValueFrom } from 'rxjs';
 import { Icon } from '../../../shared/components/icon';
 import { downloadCsv, fileDate } from '../../../shared/utils/csv';
 import {
@@ -69,6 +73,8 @@ interface ImportResult {
             <p class="text-sm text-on-surface-variant">
               Sube un archivo <strong>.xlsx</strong> o <strong>.csv</strong> con las columnas:
               <span class="font-mono text-xs">nombres, apellidos, tipodni, dni, fechanac, sexo, correo, rol, estado, contraseña</span>.
+              Para estudiantes puedes agregar también:
+              <span class="font-mono text-xs">carrera, ciclo, turno</span> (opcionales).
             </p>
             <p class="mt-2 text-xs text-on-surface-variant">
               El código institucional se genera solo. Si dejas vacíos <strong>correo</strong> y <strong>contraseña</strong>,
@@ -149,6 +155,7 @@ interface ImportResult {
                         <th scope="col">DNI</th>
                         <th scope="col">Correo</th>
                         <th scope="col">Rol</th>
+                        <th scope="col">Carrera / Ciclo / Turno</th>
                         <th scope="col">Estado</th>
                       </tr>
                     </thead>
@@ -160,6 +167,17 @@ interface ImportResult {
                           <td class="font-mono text-xs">{{ r.input.documentNumber }}</td>
                           <td class="font-mono text-xs">{{ r.input.email }}</td>
                           <td>{{ roleLabels[r.input.role] }}</td>
+                          <td class="text-xs">
+                            @if (r.input.role === 'STUDENT' && (r.careerNameRaw || r.semesterRaw || r.shiftRaw)) {
+                              <span>
+                                {{ r.careerNameRaw || '—' }}
+                                @if (r.semesterRaw) { · {{ semesterLabel(r.semesterRaw) }} }
+                                @if (r.shiftRaw) { · {{ shiftLabels[r.shiftRaw] }} }
+                              </span>
+                            } @else {
+                              —
+                            }
+                          </td>
                           <td>{{ statusLabels[r.input.status] }}</td>
                         </tr>
                       }
@@ -258,6 +276,7 @@ export class UsersImportDialog {
   protected readonly ref = inject<DialogRef<boolean>>(DialogRef);
   private readonly data = inject<UsersImportDialogData>(DIALOG_DATA);
   private readonly userService = inject(UserService);
+  private readonly careerService = inject(CareerService);
 
   protected readonly icons = {
     file: FileSpreadsheet,
@@ -270,6 +289,17 @@ export class UsersImportDialog {
   };
   protected readonly roleLabels = ROLE_LABELS;
   protected readonly statusLabels = USER_STATUS_LABELS;
+  protected readonly shiftLabels = SHIFT_LABELS;
+  protected readonly semesterLabel = semesterLabel;
+
+  /** Catálogo de carreras para resolver careerName → careerId al importar. Se carga bajo demanda. */
+  private async loadCareers() {
+    try {
+      return await firstValueFrom(this.careerService.getAll());
+    } catch {
+      return [];
+    }
+  }
 
   protected readonly step = signal<Step>('pick');
   protected readonly error = signal<string | null>(null);
@@ -355,8 +385,15 @@ export class UsersImportDialog {
     this.step.set('importing');
     this.progressDone.set(0);
     this.progressTotal.set(parsed.valid.length);
-    // Mientras se crean usuarios no se puede cerrar con Esc ni haciendo clic fuera.
     this.ref.disableClose = true;
+
+    // Carga las carreras en el momento de importar (no antes, para asegurar que están disponibles).
+    const careers = await this.loadCareers();
+    const careerByName = new Map<string, { id: string; name: string }>();
+    for (const c of careers) {
+      careerByName.set(c.name.toLowerCase().trim(), { id: c.id, name: c.name });
+      careerByName.set(c.code.toLowerCase().trim(), { id: c.id, name: c.name });
+    }
 
     const results: ImportResult[] = [];
     let stopReason: string | null = null;
@@ -372,11 +409,19 @@ export class UsersImportDialog {
 
       this.currentName.set(name);
       try {
-        await this.userService.createUser(row.input);
+        // Resuelve careerId desde el nombre de carrera del Excel.
+        const resolvedCareer = row.careerNameRaw
+          ? (careerByName.get(row.careerNameRaw.toLowerCase().trim()) ?? null)
+          : null;
+        const inputWithCareer = {
+          ...row.input,
+          careerId: resolvedCareer?.id ?? null,
+          careerName: resolvedCareer?.name ?? (row.careerNameRaw || null),
+        };
+        await this.userService.createUser(inputWithCareer);
         results.push({ ...base, ok: true });
       } catch (e) {
         results.push({ ...base, ok: false, reason: errorMessage(e) });
-        // Firebase Auth limita las altas masivas: se corta para no seguir fallando una por una.
         if ((e as { code?: string } | null)?.code === 'auth/too-many-requests') {
           stopReason = 'No se procesó: Firebase limitó las altas por demasiados intentos. Reintenta más tarde.';
         }

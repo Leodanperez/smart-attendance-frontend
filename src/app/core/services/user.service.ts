@@ -38,6 +38,7 @@ import {
   normalizeProfile,
   sortByName,
 } from '../models/user.model';
+import { Shift } from '../models/course.model';
 import { AuditService } from './audit.service';
 
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -144,6 +145,11 @@ export class UserService {
           gender: input.gender,
           phone: input.phone.trim() || null,
           address: input.address.trim() || null,
+          // Carrera/ciclo/turno: solo se guarda para estudiantes; null en otros roles.
+          careerId: input.role === 'STUDENT' ? (input.careerId ?? null) : null,
+          careerName: input.role === 'STUDENT' ? (input.careerName ?? null) : null,
+          semester: input.role === 'STUDENT' ? (input.semester ?? null) : null,
+          shift: input.role === 'STUDENT' ? (input.shift ?? null) : null,
           createdBy: this.auth.currentUser()?.uid ?? null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -255,9 +261,30 @@ export class UserService {
     await batch.commit();
   }
 
+  /** Asigna (o limpia) la carrera, ciclo y turno de un estudiante (ADMIN). */
+  async updateStudentAcademicInfo(
+    student: UserProfile,
+    info: { careerId: string | null; careerName: string | null; semester: number | null; shift: Shift | null },
+  ): Promise<void> {
+    const batch = this.run(() => writeBatch(this.firestore));
+    batch.update(this.run(() => doc(this.firestore, 'users', student.uid)), {
+      careerId: info.careerId,
+      careerName: info.careerName,
+      semester: info.semester,
+      shift: info.shift,
+      updatedAt: serverTimestamp(),
+    });
+    this.audit.addToBatch(batch, {
+      action: 'USER_UPDATED',
+      entityType: 'USER',
+      entityId: student.uid,
+      details: { fields: ['careerId', 'careerName', 'semester', 'shift'] },
+    });
+    await batch.commit();
+  }
+
   /** El propio usuario edita sus datos básicos (las reglas no le permiten tocar rol ni estado). */
-  async updateOwnProfile(input: OwnProfileInput): Promise<void> {
-    const uid = this.requireUid();
+  async updateOwnProfile(input: OwnProfileInput): Promise<void> {    const uid = this.requireUid();
     const firstName = input.firstName.trim();
     const lastName = input.lastName.trim();
     await this.run(() =>

@@ -7,7 +7,7 @@ import { catchError, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ATTENDANCE_RULE_TEXT, ATTENDANCE_STATUS_BADGE, ATTENDANCE_STATUS_LABELS } from '../../core/models/attendance.model';
 import { semesterLabel } from '../../core/models/career.model';
-import { COURSE_STATUS_BADGE, COURSE_STATUS_LABELS, Course, WEEK_DAY_LABELS } from '../../core/models/course.model';
+import { COURSE_STATUS_BADGE, COURSE_STATUS_LABELS, Course, SHIFT_LABELS, WEEK_DAY_LABELS, shiftLabel } from '../../core/models/course.model';
 import { SESSION_STATUS_BADGE, SESSION_STATUS_LABELS } from '../../core/models/session.model';
 import { fullName } from '../../core/models/user.model';
 import { AcademicScopeService } from '../../core/services/academic-scope.service';
@@ -43,6 +43,9 @@ import { TsDatePipe } from '../../shared/pipes/ts-date.pipe';
             }
             @if (c.semester) {
               <span>· {{ semesterLabel(c.semester) }}</span>
+            }
+            @if (c.shift) {
+              <span class="badge badge-blue">{{ shiftLabels[c.shift] }}</span>
             }
             <span>· Sección {{ c.section || '—' }}</span>
             @if (c.room) {
@@ -167,6 +170,7 @@ export class CourseDetail {
 
   protected readonly rule = ATTENDANCE_RULE_TEXT;
   protected readonly semesterLabel = semesterLabel;
+  protected readonly shiftLabels = SHIFT_LABELS;
   protected readonly weekDayLabels = WEEK_DAY_LABELS;
   protected readonly percent = percentLabel;
   protected readonly courseStatus = COURSE_STATUS_LABELS;
